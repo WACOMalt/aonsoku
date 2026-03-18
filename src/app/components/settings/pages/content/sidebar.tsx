@@ -13,11 +13,29 @@ import {
 import { Switch } from '@/app/components/ui/switch'
 import { useAppPages } from '@/store/app.store'
 
+const hideArtistsSectionConfig = window.HIDE_ARTISTS_SECTION ?? false
+const hideSongsSectionConfig = window.HIDE_SONGS_SECTION ?? false
+const hideAlbumsSectionConfig = window.HIDE_ALBUMS_SECTION ?? false
+const hideFavoritesSectionConfig = window.HIDE_FAVORITES_SECTION ?? false
+const hidePlaylistsSectionConfig = window.HIDE_PLAYLISTS_SECTION ?? false
 const hideRadiosSectionConfig = window.HIDE_RADIOS_SECTION ?? false
 
 export function SidebarContent() {
   const { t } = useTranslation()
-  const { hideRadiosSection, setHideRadiosSection } = useAppPages()
+  const {
+    hideArtistsSection,
+    setHideArtistsSection,
+    hideSongsSection,
+    setHideSongsSection,
+    hideAlbumsSection,
+    setHideAlbumsSection,
+    hideFavoritesSection,
+    setHideFavoritesSection,
+    hidePlaylistsSection,
+    setHidePlaylistsSection,
+    hideRadiosSection,
+    setHideRadiosSection,
+  } = useAppPages()
 
   return (
     <Root>
@@ -30,12 +48,72 @@ export function SidebarContent() {
       <Content>
         <ContentItem>
           <ContentItemTitle>
-            {t('settings.content.sidebar.radios.section')}
+            {t('sidebar.artists')}
           </ContentItemTitle>
           <ContentItemForm>
             <Switch
-              checked={hideRadiosSection}
-              onCheckedChange={setHideRadiosSection}
+              checked={!hideArtistsSection}
+              onCheckedChange={(val) => setHideArtistsSection(!val)}
+              disabled={hideArtistsSectionConfig}
+            />
+          </ContentItemForm>
+        </ContentItem>
+        <ContentItem>
+          <ContentItemTitle>
+            {t('sidebar.songs')}
+          </ContentItemTitle>
+          <ContentItemForm>
+            <Switch
+              checked={!hideSongsSection}
+              onCheckedChange={(val) => setHideSongsSection(!val)}
+              disabled={hideSongsSectionConfig}
+            />
+          </ContentItemForm>
+        </ContentItem>
+        <ContentItem>
+          <ContentItemTitle>
+            {t('sidebar.albums')}
+          </ContentItemTitle>
+          <ContentItemForm>
+            <Switch
+              checked={!hideAlbumsSection}
+              onCheckedChange={(val) => setHideAlbumsSection(!val)}
+              disabled={hideAlbumsSectionConfig}
+            />
+          </ContentItemForm>
+        </ContentItem>
+        <ContentItem>
+          <ContentItemTitle>
+            {t('sidebar.favorites')}
+          </ContentItemTitle>
+          <ContentItemForm>
+            <Switch
+              checked={!hideFavoritesSection}
+              onCheckedChange={(val) => setHideFavoritesSection(!val)}
+              disabled={hideFavoritesSectionConfig}
+            />
+          </ContentItemForm>
+        </ContentItem>
+        <ContentItem>
+          <ContentItemTitle>
+            {t('sidebar.playlists')}
+          </ContentItemTitle>
+          <ContentItemForm>
+            <Switch
+              checked={!hidePlaylistsSection}
+              onCheckedChange={(val) => setHidePlaylistsSection(!val)}
+              disabled={hidePlaylistsSectionConfig}
+            />
+          </ContentItemForm>
+        </ContentItem>
+        <ContentItem>
+          <ContentItemTitle>
+            {t('sidebar.radios')}
+          </ContentItemTitle>
+          <ContentItemForm>
+            <Switch
+              checked={!hideRadiosSection}
+              onCheckedChange={(val) => setHideRadiosSection(!val)}
               disabled={hideRadiosSectionConfig}
             />
           </ContentItemForm>

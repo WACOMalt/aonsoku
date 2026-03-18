@@ -523,10 +523,7 @@
     "content": {
       "sidebar": {
         "group": "Sidofält",
-        "description": "Hantera synligheten och organisationen av de sektioner som visas i sidofältet.",
-        "radios": {
-          "section": "Dölj radiosektionen"
-        }
+        "description": "Visa eller dölj sektioner i sidofältet."
       }
     }
   },

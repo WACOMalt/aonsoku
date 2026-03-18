@@ -612,10 +612,7 @@
     "content": {
       "sidebar": {
         "group": "Seitenleiste",
-        "radios": {
-          "section": "Radio-Abschnitt ausblenden"
-        },
-        "description": "Sichtbarkeit und Anordnung der Abschnitte in der Seitenleiste verwalten."
+        "description": "Abschnitte in der Seitenleiste ein- oder ausblenden."
       },
       "podcast": {
         "description": "Aktivieren Sie die Integration mit dem Aonsoku Podcasts-Dienst.",

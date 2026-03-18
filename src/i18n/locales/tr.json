@@ -669,10 +669,7 @@
     "content": {
       "sidebar": {
         "group": "Kenar Çubuğu",
-        "description": "Kenar çubuğunda görüntülenen bölümlerin görünürlüğünü ve organizasyonunu yönetin.",
-        "radios": {
-          "section": "Radyolar bölümünü gizle"
-        }
+        "description": "Kenar çubuğunda bölümleri göster veya gizle."
       },
       "podcast": {
         "group": "Podcast'ler",

@@ -19,6 +19,16 @@ export type PageViewType = 'grid' | 'table'
 interface IAppPages {
   showInfoPanel: boolean
   toggleShowInfoPanel: () => void
+  hideArtistsSection: boolean
+  setHideArtistsSection: (value: boolean) => void
+  hideSongsSection: boolean
+  setHideSongsSection: (value: boolean) => void
+  hideAlbumsSection: boolean
+  setHideAlbumsSection: (value: boolean) => void
+  hideFavoritesSection: boolean
+  setHideFavoritesSection: (value: boolean) => void
+  hidePlaylistsSection: boolean
+  setHidePlaylistsSection: (value: boolean) => void
   hideRadiosSection: boolean
   setHideRadiosSection: (value: boolean) => void
   artistsPageViewType: PageViewType

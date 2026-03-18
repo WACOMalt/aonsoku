@@ -589,10 +589,7 @@
     "content": {
       "sidebar": {
         "group": "侧边栏",
-        "description": "管理侧边栏中显示的区域的可见性和组织方式。",
-        "radios": {
-          "section": "隐藏电台区域"
-        }
+        "description": "在侧边栏中显示或隐藏各个部分。"
       },
       "podcast": {
         "description": "开启与 Aonsoku Podcasts 服务的集成。",

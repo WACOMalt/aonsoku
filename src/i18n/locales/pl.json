@@ -646,11 +646,8 @@
     },
     "content": {
       "sidebar": {
-        "description": "Zarządzaj widocznością i zorganizowaniem sekcji wyświetlanych na bocznym pasku.",
-        "radios": {
-          "section": "Ukryj sekcję radia"
-        },
-        "group": "Pasek boczny"
+        "group": "Pasek boczny",
+        "description": "Pokaż lub ukryj sekcje na pasku bocznym."
       },
       "podcast": {
         "service": {

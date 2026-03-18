@@ -688,11 +688,8 @@
     },
     "content": {
       "sidebar": {
-        "description": "Gestisci la visibilità e l'organizzazione delle sezioni visualizzate nella barra laterale.",
-        "radios": {
-          "section": "Nascondi selezione radio"
-        },
-        "group": "Barra laterale"
+        "group": "Barra laterale",
+        "description": "Mostra o nascondi le sezioni nella barra laterale."
       },
       "podcast": {
         "description": "Abilita integrazione con il servizio podcast Aonsoku.",

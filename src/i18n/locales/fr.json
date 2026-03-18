@@ -428,11 +428,8 @@
         }
       },
       "sidebar": {
-        "radios": {
-          "section": "Masquer la section des radios"
-        },
         "group": "Barre latérale",
-        "description": "Gérer la visibilité et l'organisation des sections affichées dans la barre latérale."
+        "description": "Afficher ou masquer des sections dans la barre latérale."
       }
     },
     "label": "Paramètres",

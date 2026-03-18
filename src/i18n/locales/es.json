@@ -700,11 +700,8 @@
         "group": "Podcasts"
       },
       "sidebar": {
-        "radios": {
-          "section": "Esconder la sección de radios"
-        },
-        "description": "Organiza la visibilidad y organización de las secciones mostradas en la barra lateral.",
-        "group": "Barra lateral"
+        "group": "Barra lateral",
+        "description": "Mostrar u ocultar secciones en la barra lateral."
       }
     },
     "privacy": {

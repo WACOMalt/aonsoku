@@ -681,10 +681,7 @@
     "content": {
       "sidebar": {
         "group": "Sidebar",
-        "description": "Manage the visibility and organization of sections displayed in the sidebar.",
-        "radios": {
-          "section": "Hide radios section"
-        }
+        "description": "Show or hide sections in the sidebar."
       },
       "podcast": {
         "group": "Podcasts",

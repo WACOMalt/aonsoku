@@ -339,10 +339,7 @@
     "content": {
       "sidebar": {
         "group": "Menu lateral",
-        "description": "Gira a visibilidade e a organização das secções exibidas no menu lateral.",
-        "radios": {
-          "section": "Esconder secção de rádios"
-        }
+        "description": "Mostrar ou ocultar secções na barra lateral."
       },
       "podcast": {
         "group": "Podcasts",

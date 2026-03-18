@@ -358,11 +358,8 @@
     },
     "content": {
       "sidebar": {
-        "description": "사이드바에 표시된 구역의 가시성과 구성을 설정합니다.",
-        "radios": {
-          "section": "라디오 구역 가리기"
-        },
-        "group": "사이드바"
+        "group": "사이드바",
+        "description": "사이드바에서 섹션을 표시하거나 숨깁니다."
       },
       "podcast": {
         "group": "팟캐스트",
