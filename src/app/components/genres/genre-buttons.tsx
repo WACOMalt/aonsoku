@@ -29,7 +29,7 @@ export function GenreButtons({ genre }: GenreButtonsProps) {
   }
 
   return (
-    <div className="w-full mb-6 flex items-center gap-2">
+    <div className="w-full flex items-center gap-2">
       <Button
         variant="secondary"
         className="rounded-full gap-2 px-5"

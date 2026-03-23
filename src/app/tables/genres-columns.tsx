@@ -30,6 +30,7 @@ export function genresColumns(): ColumnDefType<Genre>[] {
         <Link
           to={ROUTES.GENRE.PAGE(row.original.value)}
           className="hover:underline font-medium"
+          onClick={(e) => e.stopPropagation()}
         >
           {row.original.value}
         </Link>
