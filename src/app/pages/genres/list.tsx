@@ -46,7 +46,7 @@ export default function GenresList() {
         <MemoDataTable
           columns={columns}
           data={filteredGenres}
-          showPagination={false}
+          showPagination={true}
           showSearch={true}
           searchColumn="value"
           allowRowSelection={false}

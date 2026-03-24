@@ -22,14 +22,18 @@ export function genresColumns(): ColumnDefType<Genre>[] {
         minWidth: 100,
       },
       header: ({ column, table }) => (
-        <MemoDataTableColumnHeader column={column} table={table}>
+        <MemoDataTableColumnHeader
+          column={column}
+          table={table}
+          className="px-2"
+        >
           {i18n.t('table.columns.name')}
         </MemoDataTableColumnHeader>
       ),
       cell: ({ row }) => (
         <Link
           to={ROUTES.GENRE.PAGE(row.original.value)}
-          className="hover:underline font-medium"
+          className="hover:underline font-medium p-2"
           onClick={(e) => e.stopPropagation()}
         >
           {row.original.value}
