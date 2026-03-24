@@ -25,6 +25,8 @@ interface IAppPages {
   setHideSongsSection: (value: boolean) => void
   hideAlbumsSection: boolean
   setHideAlbumsSection: (value: boolean) => void
+  hideGenresSection: boolean
+  setHideGenresSection: (value: boolean) => void
   hideFavoritesSection: boolean
   setHideFavoritesSection: (value: boolean) => void
   hidePlaylistsSection: boolean
@@ -35,6 +37,7 @@ interface IAppPages {
   setArtistsPageViewType: (type: PageViewType) => void
   imagesCacheLayerEnabled: boolean
   setImagesCacheLayerEnabled: (value: boolean) => void
+  isAllSectionsHidden: () => boolean
 }
 
 export interface IAppData extends IServerConfig {

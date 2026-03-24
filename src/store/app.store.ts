@@ -25,6 +25,7 @@ const {
   HIDE_ARTISTS_SECTION,
   HIDE_SONGS_SECTION,
   HIDE_ALBUMS_SECTION,
+  HIDE_GENRES_SECTION,
   HIDE_FAVORITES_SECTION,
   HIDE_PLAYLISTS_SECTION,
   HIDE_RADIOS_SECTION,
@@ -174,6 +175,12 @@ export const useAppStore = createWithEqualityFn<IAppContext>()(
                 state.pages.hideAlbumsSection = value
               })
             },
+            hideGenresSection: HIDE_GENRES_SECTION ?? false,
+            setHideGenresSection: (value) => {
+              set((state) => {
+                state.pages.hideGenresSection = value
+              })
+            },
             hideFavoritesSection: HIDE_FAVORITES_SECTION ?? false,
             setHideFavoritesSection: (value) => {
               set((state) => {
@@ -203,6 +210,29 @@ export const useAppStore = createWithEqualityFn<IAppContext>()(
               set((state) => {
                 state.pages.imagesCacheLayerEnabled = value
               })
+            },
+            isAllSectionsHidden: () => {
+              const {
+                hideArtistsSection,
+                hideSongsSection,
+                hideAlbumsSection,
+                hideGenresSection,
+                hideFavoritesSection,
+                hidePlaylistsSection,
+                hideRadiosSection,
+              } = get().pages
+              const { active: isPodcastsActive } = get().podcasts
+
+              return (
+                hideArtistsSection &&
+                hideSongsSection &&
+                hideAlbumsSection &&
+                hideGenresSection &&
+                hideFavoritesSection &&
+                hidePlaylistsSection &&
+                hideRadiosSection &&
+                !isPodcastsActive
+              )
             },
           },
           desktop: {

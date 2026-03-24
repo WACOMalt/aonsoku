@@ -15,10 +15,15 @@ export function NavLibrary() {
   const hideArtistsSection = useAppStore().pages.hideArtistsSection
   const hideSongsSection = useAppStore().pages.hideSongsSection
   const hideAlbumsSection = useAppStore().pages.hideAlbumsSection
+  const hideGenresSection = useAppStore().pages.hideGenresSection
   const hideFavoritesSection = useAppStore().pages.hideFavoritesSection
   const hidePlaylistsSection = useAppStore().pages.hidePlaylistsSection
   const hideRadiosSection = useAppStore().pages.hideRadiosSection
   const isPodcastsActive = useAppStore().podcasts.active
+
+  const isAllSectionsHidden = useAppStore().pages.isAllSectionsHidden()
+
+  if (isAllSectionsHidden) return null
 
   return (
     <MainSidebarGroup className="px-4 py-0">
@@ -30,6 +35,7 @@ export function NavLibrary() {
             return null
           if (hideSongsSection && item.id === SidebarItems.Songs) return null
           if (hideAlbumsSection && item.id === SidebarItems.Albums) return null
+          if (hideGenresSection && item.id === SidebarItems.Genres) return null
           if (hideFavoritesSection && item.id === SidebarItems.Favorites)
             return null
           if (hidePlaylistsSection && item.id === SidebarItems.Playlists)
