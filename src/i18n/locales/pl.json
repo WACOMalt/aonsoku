@@ -729,7 +729,7 @@
             },
             "fullscreen": {
               "label": "Duży odtwarzacz",
-              "info": "Włącz animowane okładki w dużym odtwarzaczu."
+              "info": "Włącz animowaną okładkę dla aktualnej piosenki w dużym odtwarzaczu."
             },
             "playerBar": {
               "label": "Dolny pasek odtwarzacza",
