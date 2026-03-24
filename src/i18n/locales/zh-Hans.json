@@ -632,7 +632,37 @@
             "example": "示例：https://my-lrclib.com"
           }
         },
-        "description": "管理 Aonsoku 可以访问的外部服务。"
+        "description": "管理 Aonsoku 可以访问的外部服务。",
+        "animatedCover": {
+          "enabled": {
+            "label": "启用动画封面",
+            "info": "当启用时，如果可用，动画封面将从外部服务加载。"
+          },
+          "customUrl": {
+            "toggle": "使用自定义 URL",
+            "info": "使用自定义 URL 代替默认的动画艺术品 API。",
+            "label": "URL",
+            "example": "默认：https://artwork.m8tec.top"
+          },
+          "screens": {
+            "album": {
+              "label": "专辑页面",
+              "info": "在专辑标题视图中启用动画封面。"
+            },
+            "fullscreen": {
+              "label": "大播放器",
+              "info": "在大播放器中为当前歌曲启用动画封面。"
+            },
+            "playerBar": {
+              "label": "底部播放器栏",
+              "info": "在播放器栏中为当前歌曲启用动画封面。"
+            },
+            "drawer": {
+              "label": "队列和歌词",
+              "info": "在队列和歌词抽屉中为当前歌曲启用动画封面。"
+            }
+          }
+        }
       }
     },
     "accounts": {
@@ -739,7 +769,6 @@
     "headline": "流派"
   },
   "genres": {
-    "albumCount_one": "{{count}} 张专辑",
     "albumCount_other": "{{count}} 张专辑",
     "buttons": {
       "shuffleTracks": "随机曲目",
