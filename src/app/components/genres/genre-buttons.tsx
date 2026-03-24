@@ -31,7 +31,7 @@ export function GenreButtons({ genre }: GenreButtonsProps) {
   return (
     <div className="w-full flex items-center gap-2">
       <Button
-        variant="secondary"
+        variant="default"
         className="rounded-full gap-2 px-5"
         onClick={handleShuffleTracks}
       >
@@ -40,8 +40,8 @@ export function GenreButtons({ genre }: GenreButtonsProps) {
       </Button>
 
       <Button
-        variant="secondary"
-        className="rounded-full gap-2 px-5"
+        variant="ghost"
+        className="rounded-full gap-2 px-5 hover:bg-foreground/10"
         onClick={handleShuffleAlbums}
       >
         <Disc3 className="w-4 h-4" />
