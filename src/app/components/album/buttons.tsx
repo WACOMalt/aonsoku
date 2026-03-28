@@ -20,7 +20,7 @@ interface AlbumButtonsProps {
 
 export function AlbumButtons({ album, showInfoButton }: AlbumButtonsProps) {
   const { t } = useTranslation()
-  const { setSongList, togglePlayPause } = usePlayerActions()
+  const { setSongList, togglePlayPause, toggleShuffle } = usePlayerActions()
   const { showInfoPanel, toggleShowInfoPanel } = useAppPages()
   const { source } = usePlayerContext()
   const isPlaying = usePlayerStore((state) => state.playerState.isPlaying)
@@ -71,26 +71,26 @@ export function AlbumButtons({ album, showInfoButton }: AlbumButtonsProps) {
     },
   }
 
+  const playbackSource: PlaybackSource = {
+    id: album.id,
+    name: album.name,
+    type: 'album',
+  }
+
   function handlePlayButton() {
     if (isCurrentAlbumActive) {
       togglePlayPause()
     } else {
-      setSongList(album.song, 0, false, {
-        id: album.id,
-        name: album.name,
-        type: 'album',
-      })
+      setSongList(album.song, 0, false, playbackSource)
     }
   }
 
   function handleShuffleButton() {
-    const playbackSource: PlaybackSource = {
-      id: album.id,
-      name: album.name,
-      type: 'album',
+    if (isCurrentAlbumActive) {
+      toggleShuffle()
+    } else {
+      setSongList(album.song, 0, true, playbackSource)
     }
-
-    setSongList(album.song, 0, true, playbackSource)
   }
 
   return (
