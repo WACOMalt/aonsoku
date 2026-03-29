@@ -1,21 +1,20 @@
-import randomCSSHexColor from '@chriscodesthings/random-css-hex-color'
 import clsx from 'clsx'
 import { useState } from 'react'
 import { LazyLoadImage } from 'react-lazy-load-image-component'
+import { AnimatedCoverVideo } from '@/app/components/album/animated-cover-video'
 import {
   AlbumArtistInfo,
   AlbumMultipleArtistsInfo,
 } from '@/app/components/album/artists'
-import { AnimatedCoverVideo } from '@/app/components/album/animated-cover-video'
 import { ImageHeaderEffect } from '@/app/components/album/header-effect'
 import { AlbumHeaderFallback } from '@/app/components/fallbacks/album-fallbacks'
 import { BadgesData, HeaderInfoGenerator } from '@/app/components/header-info'
 import { ImageLoader } from '@/app/components/image-loader'
 import { CustomLightBox } from '@/app/components/lightbox'
+import { useAlbumColor } from '@/app/hooks/use-album-color'
 import { cn } from '@/lib/utils'
 import { CoverArt } from '@/types/coverArtType'
 import { IFeaturedArtist } from '@/types/responses/artist'
-import { getAverageColor } from '@/utils/getAverageColor'
 import { getTextSizeClass } from '@/utils/getTextSizeClass'
 
 interface ImageHeaderProps {
@@ -50,35 +49,8 @@ export default function ImageHeader({
   isPlaylist = false,
 }: ImageHeaderProps) {
   const [open, setOpen] = useState(false)
-  const [bgColor, setBgColor] = useState('')
-
-  function getImage() {
-    return document.getElementById('cover-art-image') as HTMLImageElement
-  }
-
-  async function handleLoadImage() {
-    const img = getImage()
-    if (!img) return
-
-    let color = randomCSSHexColor(true)
-
-    try {
-      color = (await getAverageColor(img)).hex
-    } catch (_) {
-      console.warn(
-        'handleLoadImage: unable to get image color. Using a random color.',
-      )
-    }
-
-    setBgColor(color)
-  }
-
-  function handleError() {
-    const img = getImage()
-    if (!img) return
-
-    img.crossOrigin = null
-  }
+  const { bgColor, handleLoadImage, handleError } =
+    useAlbumColor('cover-art-image')
 
   const hasMultipleArtists = artists ? artists.length > 1 : false
 
