@@ -91,7 +91,9 @@ export function QueueSongList() {
           columns={columns}
           columnFilter={columnsToShow}
           showHeader={false}
-          handlePlaySong={(row) => setSongList(currentList, row.index)}
+          handlePlaySong={(row) =>
+            setSongList(currentList, row.index, undefined, source)
+          }
           scrollToIndex={true}
           currentSongIndex={currentSongIndex}
           allowRowSelection={false}
