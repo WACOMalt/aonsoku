@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 import { ComponentPropsWithoutRef, useEffect, useState } from 'react'
 import { LazyLoadImage } from 'react-lazy-load-image-component'
 import { cn } from '@/lib/utils'
@@ -27,7 +28,7 @@ export function StickyHeader({
       const target = e.target as HTMLElement
       const scrollTop = target.scrollTop
 
-      const startFade = 50
+      const startFade = 30
       const endFade = 300
 
       if (scrollTop <= startFade) {
@@ -120,15 +121,17 @@ export function StickyHeaderContent({
 type StickyHeaderImageProps = ComponentPropsWithoutRef<typeof LazyLoadImage> & {
   id: string
   type: CoverArt
+  size?: string
 }
 
 export function StickyHeaderImage({
   id,
   type,
+  size = '80',
   ...props
 }: StickyHeaderImageProps) {
   return (
-    <ImageLoader id={id} type={type} size="80">
+    <ImageLoader id={id} type={type} size={size}>
       {(src) => (
         <div className="w-10 h-10 min-w-10 min-h-10 shrink-0 bg-skeleton rounded overflow-hidden shadow-md">
           {src ? (
@@ -155,7 +158,14 @@ type StickyHeaderTextsProps = {
 export function StickyHeaderTexts({ title, subtitle }: StickyHeaderTextsProps) {
   return (
     <div className="flex flex-col justify-center overflow-hidden">
-      <span className="text-sm font-semibold truncate">{title}</span>
+      <span
+        className={clsx(
+          'font-semibold truncate',
+          subtitle ? 'text-sm' : 'text-2xl mt-0.5',
+        )}
+      >
+        {title}
+      </span>
       {subtitle && (
         <span className="text-xs text-foreground opacity-80 truncate">
           {subtitle}
