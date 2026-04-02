@@ -47,6 +47,26 @@
   </screenshots>
 
   <releases>
+    <release version="0.14.0" date="2026-04-02">
+      <url type="details">https://github.com/victoralvesf/aonsoku/releases/tag/v0.14.0</url>
+      <description>
+        <p>New Features</p>
+        <ul>
+          <li>Animated Artworks: Added support for animated artworks fetched from Apple Music.</li>
+          <li>Playback Context: Introduced playback context for the currently playing track (covering albums, artists, playlists, favorites, and songs).</li>
+          <li>Customizable Sidebar: Added new options in the content settings to hide specific sidebar items.</li>
+          <li>Genres Page: Added a dedicated Genres page, featuring the ability to shuffle and play up to 500 random tracks from a selected genre.</li>
+          <li>Performance Optimization: Implemented virtualized lists for large playlists and albums to significantly improve page rendering and performance.</li>
+          <li>Sticky Headers: Added a sticky header to the album, artist, and playlist pages so playback controls and content titles remain visible while scrolling.</li>
+          <li>Localization: Added language support for Traditional Cantonese.</li>
+        </ul>
+        <p>Fixes</p>
+        <ul>
+          <li>Login Validation: Adjusted username and password validation to allow single-character inputs.</li>
+          <li>Auto-Updater: Fixed an issue where the auto-updater was failing to download and install new updates.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.13.0" date="2026-02-26">
       <url type="details">https://github.com/victoralvesf/aonsoku/releases/tag/v0.13.0</url>
       <description>
