@@ -794,6 +794,7 @@
   },
   "genres": {
     "albumCount_one": "{{count}} álbum",
+    "albumCount_many": "{{count}} álbuns",
     "albumCount_other": "{{count}} álbuns",
     "buttons": {
       "shuffleTracks": "Faixas aleatórias",
