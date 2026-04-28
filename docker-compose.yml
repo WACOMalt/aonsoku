@@ -3,13 +3,24 @@ version: '3.8'
 services:
   aonsoku:
     container_name: aonsoku
-    image: ghcr.io/victoralvesf/aonsoku:latest
+    build: .
     restart: unless-stopped
     ports:
-      - 8080:8080
+      - 8097:8080
     environment:
       - APP_USER=${APP_USER}
       - APP_PASSWORD=${APP_PASSWORD}
       - APP_AUTH_TYPE=${APP_AUTH_TYPE}
       - SERVER_URL=${SERVER_URL}
       - HIDE_SERVER=${HIDE_SERVER}
+
+  jam-sync:
+    container_name: jam-sync
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./jam-sync-server:/app
+    command: sh -c "npm install && node index.js"
+    ports:
+      - 7548:7548
+    restart: unless-stopped
