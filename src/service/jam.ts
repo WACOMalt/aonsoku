@@ -7,6 +7,8 @@ import { ISong } from '@/types/responses/song'
 class JamService {
   private socket: Socket | null = null
   private initialized = false
+  // Suppresses the drift-correction subscriber while we are applying a remote sync
+  private isSyncing = false
 
   private get syncServerUrl() {
     return window.location.origin
@@ -16,10 +18,15 @@ class JamService {
     if (this.initialized) return
     this.initialized = true
 
-    // Watch for guest drift: if a non-controlling guest changes song, snap them back
+    // Watch for guest drift: if a non-controlling guest manually changes song, snap them back.
+    // Guard with isSyncing so we don't create a feedback loop when handleRemoteSync itself
+    // changes the song.
     usePlayerStore.subscribe(
       (state) => state.songlist.currentSong?.id,
       (currentSongId) => {
+        // Never snap back while we are in the middle of applying a remote sync
+        if (this.isSyncing) return
+
         const { isConnected, isLead, canGuestsControl, lastLeadState } = useJamStore.getState()
         // Only act for connected guests who don't have control permission
         if (!isConnected || isLead || canGuestsControl) return
@@ -85,7 +92,7 @@ class JamService {
       this.socket?.disconnect()
       this.socket = null
       useJamStore.getState().actions.reset()
-      // Import toast dynamically to avoid circular deps — use a custom event instead
+      // Use a custom event to avoid circular deps with toast
       window.dispatchEvent(new CustomEvent('jam:session_ended'))
     })
   }
@@ -104,7 +111,7 @@ class JamService {
       songId: currentSong.id,
       isPlaying: playerState.isPlaying,
       progress: playerProgress.progress,
-      queue: songlist.currentList, // Sync the full queue
+      queue: songlist.currentList,
       timestamp: Date.now()
     })
   }
@@ -140,62 +147,73 @@ class JamService {
     timestamp: number,
     queue?: ISong[]
   }) {
-    const { actions, songlist, playerState } = usePlayerStore.getState()
+    // Set flag so the drift-correction subscriber ignores changes we make here
+    this.isSyncing = true
 
-    // Save the lead's last known state so we can re-sync guests who drift
-    useJamStore.getState().actions.setLastLeadState({
-      songId: data.songId,
-      isPlaying: data.isPlaying,
-      progress: data.progress,
-      timestamp: data.timestamp,
-      queue: data.queue,
-    })
+    try {
+      const { actions, songlist, playerState } = usePlayerStore.getState()
 
-    // 1. Sync Queue if provided and different
-    if (data.queue && JSON.stringify(data.queue.map((s: ISong) => s.id)) !== JSON.stringify(songlist.currentList.map((s: ISong) => s.id))) {
+      // Save the lead's last known state so we can re-sync guests who drift
+      useJamStore.getState().actions.setLastLeadState({
+        songId: data.songId,
+        isPlaying: data.isPlaying,
+        progress: data.progress,
+        timestamp: data.timestamp,
+        queue: data.queue,
+      })
+
+      // 1. Sync Queue if provided and different
+      if (data.queue && JSON.stringify(data.queue.map((s: ISong) => s.id)) !== JSON.stringify(songlist.currentList.map((s: ISong) => s.id))) {
         console.log('[Jam] Syncing shared queue')
         const newIndex = data.queue.findIndex((s: ISong) => s.id === data.songId)
         if (newIndex !== -1) {
-            usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
-                state.songlist.currentList = data.queue!
-                state.songlist.currentSongIndex = newIndex
-                state.songlist.currentSong = data.queue![newIndex]
-            })
+          usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
+            state.songlist.currentList = data.queue!
+            state.songlist.currentSongIndex = newIndex
+            state.songlist.currentSong = data.queue![newIndex]
+          })
         }
-    } else if (songlist.currentSong?.id !== data.songId) {
+      } else if (songlist.currentSong?.id !== data.songId) {
         // Same queue but different song (e.g. host skipped to next/prev track)
         console.log('[Jam] Syncing song change within existing queue')
         const newIndex = songlist.currentList.findIndex((s: ISong) => s.id === data.songId)
         if (newIndex !== -1) {
-            usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
-                state.songlist.currentSongIndex = newIndex
-                state.songlist.currentSong = state.songlist.currentList[newIndex]
-            })
+          usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
+            state.songlist.currentSongIndex = newIndex
+            state.songlist.currentSong = state.songlist.currentList[newIndex]
+          })
         } else if (data.queue) {
-            // Song not found in current list at all — use the provided queue
-            const queueIndex = data.queue.findIndex((s: ISong) => s.id === data.songId)
-            if (queueIndex !== -1) {
-                usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
-                    state.songlist.currentList = data.queue!
-                    state.songlist.currentSongIndex = queueIndex
-                    state.songlist.currentSong = data.queue![queueIndex]
-                })
-            }
+          // Song not found in current list at all — use the provided queue
+          const queueIndex = data.queue.findIndex((s: ISong) => s.id === data.songId)
+          if (queueIndex !== -1) {
+            usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
+              state.songlist.currentList = data.queue!
+              state.songlist.currentSongIndex = queueIndex
+              state.songlist.currentSong = data.queue![queueIndex]
+            })
+          }
         }
-    }
+      }
 
-    // Sync play/pause
-    if (playerState.isPlaying !== data.isPlaying) {
+      // Sync play/pause
+      if (playerState.isPlaying !== data.isPlaying) {
         actions.setPlayingState(data.isPlaying)
-    }
+      }
 
-    // Sync progress if drift is > 2 seconds
-    const audio = playerState.audioPlayerRef
-    if (audio) {
+      // Sync progress if drift is > 2 seconds
+      const audio = playerState.audioPlayerRef
+      if (audio) {
         const drift = Math.abs(audio.currentTime - data.progress)
         if (drift > 2) {
-            audio.currentTime = data.progress
+          audio.currentTime = data.progress
         }
+      }
+    } finally {
+      // Always clear the flag, even if an error occurs
+      // Use a microtask so Zustand's synchronous subscriber fires first
+      Promise.resolve().then(() => {
+        this.isSyncing = false
+      })
     }
   }
 
