@@ -3,14 +3,19 @@ import { useJamStore } from '@/store/jam.store'
 import { useAppStore } from '@/store/app.store'
 import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
-import { shallow } from 'zustand/shallow'
 
 class JamService {
   private socket: Socket | null = null
-  // Uses the same domain as the frontend by default
-  private syncServerUrl = window.location.origin
+  private initialized = false
 
-  constructor() {
+  private get syncServerUrl() {
+    return window.location.origin
+  }
+
+  private init() {
+    if (this.initialized) return
+    this.initialized = true
+
     // Watch for guest drift: if a non-controlling guest changes song, snap them back
     usePlayerStore.subscribe(
       (state) => state.songlist.currentSong?.id,
@@ -28,6 +33,8 @@ class JamService {
   }
 
   connect() {
+    this.init()
+
     const { id: sessionId, isLead } = useJamStore.getState()
     const { username } = useAppStore.getState().data
     const { setConnected, setConnecting, setError, setParticipants } = useJamStore.getState().actions
@@ -134,7 +141,7 @@ class JamService {
     queue?: ISong[]
   }) {
     const { actions, songlist, playerState } = usePlayerStore.getState()
-    
+
     // Save the lead's last known state so we can re-sync guests who drift
     useJamStore.getState().actions.setLastLeadState({
       songId: data.songId,
