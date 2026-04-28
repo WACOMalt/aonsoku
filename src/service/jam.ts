@@ -19,7 +19,7 @@ class JamService {
     setConnecting(true)
 
     this.socket = io(this.syncServerUrl, {
-      path: ':7548/jam-sync/socket.io', // Specify the bizarre port
+      path: '/jam-sync/socket.io', // Proxy-compatible path
       query: { sessionId, username, isLead: String(isLead) }
     })
 
