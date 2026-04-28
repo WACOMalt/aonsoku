@@ -1377,13 +1377,16 @@ export const useIsSingleSongPlaying = (songId: string) => {
 }
 
 // Jam Syncing Subscriptions
-// 1. Immediate emit on play/pause or song change — these must never be throttled
+// 1. Immediate emit on play/pause or song change — these must never be throttled.
+//    Guard with jamService.isSyncing to prevent feedback loops when handleRemoteSync
+//    itself changes the song/play state.
 usePlayerStore.subscribe(
   (state) => ({
     songId: state.songlist.currentSong?.id,
     isPlaying: state.playerState.isPlaying,
   }),
   () => {
+    if (jamService.isSyncing) return
     jamService.emitPlaybackState()
   },
   {
@@ -1391,7 +1394,8 @@ usePlayerStore.subscribe(
   },
 )
 
-// 2. Throttled emit on progress/queue changes (at most once per second)
+// 2. Throttled emit on progress/queue changes (at most once per second).
+//    Also guarded against syncing state to prevent loops.
 let lastProgressEmit = 0
 usePlayerStore.subscribe(
   (state) => ({
@@ -1399,6 +1403,7 @@ usePlayerStore.subscribe(
     currentList: state.songlist.currentList,
   }),
   () => {
+    if (jamService.isSyncing) return
     const now = Date.now()
     if (now - lastProgressEmit > 1000) {
       jamService.emitPlaybackState()

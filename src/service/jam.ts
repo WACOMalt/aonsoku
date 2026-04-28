@@ -7,8 +7,13 @@ import { ISong } from '@/types/responses/song'
 class JamService {
   private socket: Socket | null = null
   private initialized = false
-  // Suppresses the drift-correction subscriber while we are applying a remote sync
-  private isSyncing = false
+  // Suppresses both the drift-correction subscriber AND the emit subscriber
+  // while we are applying a remote sync, preventing feedback loops
+  private _isSyncing = false
+
+  get isSyncing() {
+    return this._isSyncing
+  }
 
   private get syncServerUrl() {
     return window.location.origin
@@ -19,13 +24,13 @@ class JamService {
     this.initialized = true
 
     // Watch for guest drift: if a non-controlling guest manually changes song, snap them back.
-    // Guard with isSyncing so we don't create a feedback loop when handleRemoteSync itself
+    // Guard with _isSyncing so we don't create a feedback loop when handleRemoteSync itself
     // changes the song.
     usePlayerStore.subscribe(
       (state) => state.songlist.currentSong?.id,
       (currentSongId) => {
         // Never snap back while we are in the middle of applying a remote sync
-        if (this.isSyncing) return
+        if (this._isSyncing) return
 
         const { isConnected, isLead, canGuestsControl, lastLeadState } = useJamStore.getState()
         // Only act for connected guests who don't have control permission
@@ -147,8 +152,9 @@ class JamService {
     timestamp: number,
     queue?: ISong[]
   }) {
-    // Set flag so the drift-correction subscriber ignores changes we make here
-    this.isSyncing = true
+    // Set flag so both the drift-correction subscriber AND the emit subscriber
+    // ignore changes we make here, preventing feedback loops
+    this._isSyncing = true
 
     try {
       const { actions, songlist, playerState } = usePlayerStore.getState()
@@ -213,7 +219,7 @@ class JamService {
       // Always clear the flag, even if an error occurs
       // Use a microtask so Zustand's synchronous subscriber fires first
       Promise.resolve().then(() => {
-        this.isSyncing = false
+        this._isSyncing = false
       })
     }
   }
