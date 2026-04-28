@@ -1,0 +1,9 @@
+{
+  "name": "jam-sync-server",
+  "version": "1.0.0",
+  "description": "Sync server for Aonsoku Jam sessions",
+  "main": "index.js",
+  "dependencies": {
+    "socket.io": "^4.7.5"
+  }
+}

@@ -18,6 +18,7 @@ import { ISong } from '@/types/responses/song'
 import { areSongListsEqual } from '@/utils/compareSongLists'
 import { isDesktop } from '@/utils/desktop'
 import { discordRpc } from '@/utils/discordRpc'
+import { jamService } from '@/service/jam'
 import { addNextSongList, shuffleSongList } from '@/utils/songListFunctions'
 import { idbStorage } from './idb'
 
@@ -1374,3 +1375,24 @@ export const useIsSingleSongPlaying = (songId: string) => {
     isSongPlaying,
   }
 }
+
+// Jam Syncing Subscription
+let lastEmit = 0
+usePlayerStore.subscribe(
+  (state) => [
+    state.songlist.currentSong?.id,
+    state.playerState.isPlaying,
+    state.playerProgress.progress,
+    state.songlist.currentList,
+  ],
+  () => {
+    const now = Date.now()
+    if (now - lastEmit > 1000) { // Throttle emits to once per second
+      jamService.emitPlaybackState()
+      lastEmit = now
+    }
+  },
+  {
+    equalityFn: shallow,
+  },
+)

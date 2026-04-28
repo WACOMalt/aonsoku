@@ -31,6 +31,7 @@ import { PodcastPlaybackRate } from './podcast-playback-rate'
 import { PlayerProgress } from './progress'
 import { PlayerQueueButton } from './queue-button'
 import { PlayerVolume } from './volume'
+import { JamButton } from './jam-button'
 
 const MemoTrackInfo = memo(TrackInfo)
 const MemoRadioInfo = memo(RadioInfo)
@@ -41,6 +42,7 @@ const MemoPlayerLikeButton = memo(PlayerLikeButton)
 const MemoPlayerQueueButton = memo(PlayerQueueButton)
 const MemoPlayerClearQueueButton = memo(PlayerClearQueueButton)
 const MemoPlayerVolume = memo(PlayerVolume)
+const MemoJamButton = memo(JamButton)
 const MemoPlayerExpandButton = memo(PlayerExpandButton)
 const MemoPodcastPlaybackRate = memo(PodcastPlaybackRate)
 const MemoLyricsButton = memo(PlayerLyricsButton)
@@ -223,6 +225,8 @@ export function Player() {
             {(isRadio || isPodcast) && (
               <MemoPlayerClearQueueButton disabled={!radio && !podcast} />
             )}
+
+            <MemoJamButton />
 
             <MemoPlayerVolume
               audioRef={getAudioRef()}
