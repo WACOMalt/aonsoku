@@ -99,6 +99,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.30.3",
     "react-toastify": "^10.0.6",
+    "socket.io-client": "^4.7.5",
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "standardized-audio-context": "^25.3.77",
