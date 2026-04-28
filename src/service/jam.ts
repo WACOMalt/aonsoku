@@ -200,13 +200,14 @@ class JamService {
         actions.setPlayingState(data.isPlaying)
       }
 
-      // Sync progress if drift is > 2 seconds
+      // Sync progress if drift exceeds the configurable threshold
+      const { syncThreshold } = useJamStore.getState()
       const audio = playerState.audioPlayerRef
       if (audio) {
-        const drift = Math.abs(audio.currentTime - data.progress)
-        if (drift > 2) {
-          audio.currentTime = data.progress
-        }
+          const drift = Math.abs(audio.currentTime - data.progress)
+          if (drift > syncThreshold) {
+              audio.currentTime = data.progress
+          }
       }
     } finally {
       // Always clear the flag, even if an error occurs

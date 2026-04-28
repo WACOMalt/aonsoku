@@ -12,6 +12,7 @@ import {
 } from '@/app/components/ui/dialog'
 import { Input } from '@/app/components/ui/input'
 import { Switch } from '@/app/components/ui/switch'
+import { Slider } from '@/app/components/ui/slider'
 import { useJamState, useJamActions } from '@/store/jam.store'
 import { jamService } from '@/service/jam'
 import { ROUTES } from '@/routes/routesList'
@@ -19,8 +20,8 @@ import { toast } from 'react-toastify'
 
 export function JamButton() {
   const { t } = useTranslation()
-  const { id, isConnected, participants, isLead, canGuestsControl, isConnecting, error } = useJamState()
-  const { reset } = useJamActions()
+  const { id, isConnected, participants, isLead, canGuestsControl, isConnecting, error, syncThreshold } = useJamState()
+  const { reset, setSyncThreshold } = useJamActions()
   const [joinId, setJoinId] = useState('')
 
   // Listen for host-ended session event from jamService
@@ -104,7 +105,7 @@ export function JamButton() {
 
               {isConnecting && <p className="text-sm text-muted-foreground">Connecting...</p>}
               {error && <p className="text-sm text-destructive">Error: {error}</p>}
-              
+
               <div className="bg-secondary/20 p-3 rounded-md">
                 <h4 className="text-sm font-semibold mb-2">Participants ({participants.length})</h4>
                 <ul className="text-sm space-y-1">
@@ -126,6 +127,24 @@ export function JamButton() {
                   />
                 </div>
               )}
+
+              <div className="flex flex-col gap-2 mt-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Sync threshold</span>
+                  <span className="text-sm font-mono text-muted-foreground">{syncThreshold}s</span>
+                </div>
+                <Slider
+                  min={0.5}
+                  max={10}
+                  step={0.5}
+                  value={[syncThreshold]}
+                  onValueChange={([val]) => setSyncThreshold(val)}
+                  className="w-full"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Minimum playback drift before snapping to the lead's position.
+                </p>
+              </div>
 
               <Button variant="destructive" onClick={handleLeave}>
                 {isLead ? 'End Jam for all' : 'Leave Jam'}

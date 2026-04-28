@@ -26,6 +26,7 @@ export interface IJamSession {
   isLead: boolean
   canGuestsControl: boolean
   lastLeadState: IJamLeadState | null
+  syncThreshold: number
 }
 
 interface IJamActions {
@@ -39,6 +40,7 @@ interface IJamActions {
   setConnected: (value: boolean) => void
   setCanGuestsControl: (value: boolean) => void
   setLastLeadState: (state: IJamLeadState) => void
+  setSyncThreshold: (value: number) => void
 }
 
 export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
@@ -54,6 +56,7 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
           isLead: false,
           canGuestsControl: false,
           lastLeadState: null,
+          syncThreshold: 2,
           actions: {
             setSession: (sessionId, isLead) => {
               set((state) => {
@@ -117,11 +120,16 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
                 state.lastLeadState = leadState
               })
             },
+            setSyncThreshold: (value) => {
+              set((state) => {
+                state.syncThreshold = value
+              })
+            },
           },
         }),
         {
           name: 'jam-storage',
-          partialize: (state) => ({ id: state.id, isLead: state.isLead }),
+          partialize: (state) => ({ id: state.id, isLead: state.isLead, syncThreshold: state.syncThreshold }),
         },
       ),
     ),
@@ -137,4 +145,5 @@ export const useJamState = () => useJamStore((state) => ({
     isLead: state.isLead,
     error: state.error,
     canGuestsControl: state.canGuestsControl,
+    syncThreshold: state.syncThreshold,
 }))
