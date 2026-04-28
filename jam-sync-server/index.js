@@ -21,7 +21,8 @@ io.on('connection', (socket) => {
   if (!sessions[sessionId]) {
     sessions[sessionId] = { 
         participants: [], 
-        lastState: null 
+        lastState: null,
+        canGuestsControl: false
     };
     console.log(`[Jam] Session created: ${sessionId} by ${username}`);
   }
@@ -40,17 +41,54 @@ io.on('connection', (socket) => {
   // If there's an existing playback state, catch the new user up
   if (sessions[sessionId].lastState) {
     socket.emit('sync_playback', sessions[sessionId].lastState);
+    socket.emit('guest_control_update', { canGuestsControl: sessions[sessionId].canGuestsControl || false });
   }
 
   console.log(`[Jam] ${username} joined session ${sessionId} (Lead: ${isLead})`);
 
   socket.on('playback_update', (data) => {
-    // Only trust updates from the lead
-    if (user.isLead) {
-      sessions[sessionId].lastState = data;
+    const session = sessions[sessionId];
+    if (!session) return;
+    const sender = session.participants.find(p => p.id === socket.id);
+    // Allow lead or guests if canGuestsControl is enabled
+    if (sender && (sender.isLead || session.canGuestsControl)) {
+      session.lastState = data;
       // Broadcast to others in the same session
       socket.to(sessionId).emit('sync_playback', data);
     }
+  });
+
+  socket.on('leave_session', () => {
+    const session = sessions[sessionId];
+    if (session) {
+      session.participants = session.participants.filter(p => p.id !== socket.id);
+      if (session.participants.length === 0) {
+        delete sessions[sessionId];
+      } else {
+        io.to(sessionId).emit('participants_update', session.participants);
+      }
+    }
+    socket.leave(sessionId);
+    socket.disconnect(true);
+  });
+
+  socket.on('set_guest_control', ({ canControl }) => {
+    const session = sessions[sessionId];
+    if (!session) return;
+    const sender = session.participants.find(p => p.id === socket.id);
+    if (!sender || !sender.isLead) return;
+    session.canGuestsControl = canControl;
+    io.to(sessionId).emit('guest_control_update', { canGuestsControl: canControl });
+  });
+
+  socket.on('end_session', () => {
+    const session = sessions[sessionId];
+    if (!session) return;
+    const sender = session.participants.find(p => p.id === socket.id);
+    if (!sender || !sender.isLead) return;
+    io.to(sessionId).emit('session_ended');
+    delete sessions[sessionId];
+    socket.disconnect(true);
   });
 
   socket.on('disconnect', () => {

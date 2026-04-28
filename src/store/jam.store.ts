@@ -3,6 +3,14 @@ import { devtools, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { ISong } from '@/types/responses/song'
 
+export interface IJamLeadState {
+  songId: string
+  isPlaying: boolean
+  progress: number
+  timestamp: number
+  queue?: ISong[]
+}
+
 export interface IJamParticipant {
   id: string
   name: string
@@ -16,6 +24,8 @@ export interface IJamSession {
   isConnected: boolean
   error: string | null
   isLead: boolean
+  canGuestsControl: boolean
+  lastLeadState: IJamLeadState | null
 }
 
 interface IJamActions {
@@ -27,6 +37,8 @@ interface IJamActions {
   setError: (error: string | null) => void
   setConnecting: (value: boolean) => void
   setConnected: (value: boolean) => void
+  setCanGuestsControl: (value: boolean) => void
+  setLastLeadState: (state: IJamLeadState) => void
 }
 
 export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
@@ -40,6 +52,8 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
           isConnected: false,
           error: null,
           isLead: false,
+          canGuestsControl: false,
+          lastLeadState: null,
           actions: {
             setSession: (sessionId, isLead) => {
               set((state) => {
@@ -74,6 +88,8 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
                 state.isConnecting = false
                 state.isLead = false
                 state.error = null
+                state.canGuestsControl = false
+                state.lastLeadState = null
               })
             },
             setError: (error) => {
@@ -89,6 +105,16 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
             setConnected: (value) => {
               set((state) => {
                 state.isConnected = value
+              })
+            },
+            setCanGuestsControl: (value) => {
+              set((state) => {
+                state.canGuestsControl = value
+              })
+            },
+            setLastLeadState: (leadState) => {
+              set((state) => {
+                state.lastLeadState = leadState
               })
             },
           },
@@ -109,4 +135,6 @@ export const useJamState = () => useJamStore((state) => ({
     isConnected: state.isConnected,
     isConnecting: state.isConnecting,
     isLead: state.isLead,
+    error: state.error,
+    canGuestsControl: state.canGuestsControl,
 }))

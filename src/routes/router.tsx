@@ -48,6 +48,7 @@ const Episode = lazy(() => import('@/app/pages/podcasts/episode'))
 const LatestEpisodes = lazy(
   () => import('@/app/pages/podcasts/latest-episodes'),
 )
+const JamJoin = lazy(() => import('@/app/pages/jam/join'))
 
 export const router = createHashRouter([
   {
@@ -217,6 +218,15 @@ export const router = createHashRouter([
         element: (
           <Suspense fallback={<LatestEpisodesFallback />}>
             <LatestEpisodes />
+          </Suspense>
+        ),
+      },
+      {
+        id: 'jam-join',
+        path: ROUTES.JAM.PATH,
+        element: (
+          <Suspense>
+            <JamJoin />
           </Suspense>
         ),
       },

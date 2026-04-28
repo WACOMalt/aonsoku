@@ -3,11 +3,29 @@ import { useJamStore } from '@/store/jam.store'
 import { useAppStore } from '@/store/app.store'
 import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
+import { shallow } from 'zustand/shallow'
 
 class JamService {
   private socket: Socket | null = null
   // Uses the same domain as the frontend by default
-  private syncServerUrl = window.location.origin 
+  private syncServerUrl = window.location.origin
+
+  constructor() {
+    // Watch for guest drift: if a non-controlling guest changes song, snap them back
+    usePlayerStore.subscribe(
+      (state) => state.songlist.currentSong?.id,
+      (currentSongId) => {
+        const { isConnected, isLead, canGuestsControl, lastLeadState } = useJamStore.getState()
+        // Only act for connected guests who don't have control permission
+        if (!isConnected || isLead || canGuestsControl) return
+        // If there's a known lead state and the guest has drifted to a different song, snap back
+        if (lastLeadState && currentSongId && currentSongId !== lastLeadState.songId) {
+          console.log('[Jam] Guest drifted from lead song — snapping back')
+          this.handleRemoteSync(lastLeadState)
+        }
+      }
+    )
+  }
 
   connect() {
     const { id: sessionId, isLead } = useJamStore.getState()
@@ -45,14 +63,30 @@ class JamService {
       timestamp: number,
       queue?: ISong[]
     }) => {
-      if (useJamStore.getState().isLead) return 
+      const { isLead, canGuestsControl } = useJamStore.getState()
+      // Lead only syncs from guests when canGuestsControl is enabled
+      if (isLead && !canGuestsControl) return
 
       this.handleRemoteSync(data)
+    })
+
+    this.socket.on('guest_control_update', ({ canGuestsControl }: { canGuestsControl: boolean }) => {
+      useJamStore.getState().actions.setCanGuestsControl(canGuestsControl)
+    })
+
+    this.socket.on('session_ended', () => {
+      this.socket?.disconnect()
+      this.socket = null
+      useJamStore.getState().actions.reset()
+      // Import toast dynamically to avoid circular deps — use a custom event instead
+      window.dispatchEvent(new CustomEvent('jam:session_ended'))
     })
   }
 
   emitPlaybackState() {
-    if (!this.socket?.connected || !useJamStore.getState().isLead) return
+    const { isLead, canGuestsControl } = useJamStore.getState()
+    if (!this.socket?.connected) return
+    if (!isLead && !canGuestsControl) return
 
     const { songlist, playerState, playerProgress } = usePlayerStore.getState()
     const currentSong = songlist.currentSong
@@ -68,6 +102,30 @@ class JamService {
     })
   }
 
+  disconnect() {
+    if (this.socket) {
+      this.socket.emit('leave_session')
+      this.socket.disconnect()
+      this.socket = null
+    }
+    useJamStore.getState().actions.reset()
+  }
+
+  endSession() {
+    if (this.socket) {
+      this.socket.emit('end_session')
+      this.socket.disconnect()
+      this.socket = null
+    }
+    useJamStore.getState().actions.reset()
+  }
+
+  setGuestControl(canControl: boolean) {
+    if (this.socket?.connected) {
+      this.socket.emit('set_guest_control', { canControl })
+    }
+  }
+
   private handleRemoteSync(data: {
     songId: string,
     isPlaying: boolean,
@@ -77,18 +135,45 @@ class JamService {
   }) {
     const { actions, songlist, playerState } = usePlayerStore.getState()
     
+    // Save the lead's last known state so we can re-sync guests who drift
+    useJamStore.getState().actions.setLastLeadState({
+      songId: data.songId,
+      isPlaying: data.isPlaying,
+      progress: data.progress,
+      timestamp: data.timestamp,
+      queue: data.queue,
+    })
+
     // 1. Sync Queue if provided and different
-    if (data.queue && JSON.stringify(data.queue.map(s => s.id)) !== JSON.stringify(songlist.currentList.map(s => s.id))) {
+    if (data.queue && JSON.stringify(data.queue.map((s: ISong) => s.id)) !== JSON.stringify(songlist.currentList.map((s: ISong) => s.id))) {
         console.log('[Jam] Syncing shared queue')
-        // We find the index of the current song in the new queue
-        const newIndex = data.queue.findIndex(s => s.id === data.songId)
+        const newIndex = data.queue.findIndex((s: ISong) => s.id === data.songId)
         if (newIndex !== -1) {
-            // Update the store without triggering an infinite loop
-            usePlayerStore.setState(state => {
+            usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
                 state.songlist.currentList = data.queue!
                 state.songlist.currentSongIndex = newIndex
                 state.songlist.currentSong = data.queue![newIndex]
             })
+        }
+    } else if (songlist.currentSong?.id !== data.songId) {
+        // Same queue but different song (e.g. host skipped to next/prev track)
+        console.log('[Jam] Syncing song change within existing queue')
+        const newIndex = songlist.currentList.findIndex((s: ISong) => s.id === data.songId)
+        if (newIndex !== -1) {
+            usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
+                state.songlist.currentSongIndex = newIndex
+                state.songlist.currentSong = state.songlist.currentList[newIndex]
+            })
+        } else if (data.queue) {
+            // Song not found in current list at all — use the provided queue
+            const queueIndex = data.queue.findIndex((s: ISong) => s.id === data.songId)
+            if (queueIndex !== -1) {
+                usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
+                    state.songlist.currentList = data.queue!
+                    state.songlist.currentSongIndex = queueIndex
+                    state.songlist.currentSong = data.queue![queueIndex]
+                })
+            }
         }
     }
 
@@ -115,7 +200,30 @@ class JamService {
   }
 
   joinSession(sessionId: string) {
-    useJamStore.getState().actions.setSession(sessionId, false)
+    // Handle full invite URLs in both formats:
+    //   https://mus.bsums.xyz/#/jam/abc123  (hash router — hash contains the path)
+    //   https://mus.bsums.xyz/jam/abc123    (plain path)
+    let resolvedId = sessionId.trim()
+    try {
+      const url = new URL(resolvedId)
+      // Hash router: hash is like "#/jam/abc123"
+      const hashPath = url.hash.replace(/^#\/?/, '') // strip leading "#" or "#/"
+      const hashParts = hashPath.split('/')
+      const hashJamIndex = hashParts.indexOf('jam')
+      if (hashJamIndex !== -1 && hashParts[hashJamIndex + 1]) {
+        resolvedId = hashParts[hashJamIndex + 1]
+      } else {
+        // Plain path: pathname is like "/jam/abc123"
+        const pathParts = url.pathname.split('/')
+        const pathJamIndex = pathParts.indexOf('jam')
+        if (pathJamIndex !== -1 && pathParts[pathJamIndex + 1]) {
+          resolvedId = pathParts[pathJamIndex + 1]
+        }
+      }
+    } catch {
+      // Not a URL, use as-is
+    }
+    useJamStore.getState().actions.setSession(resolvedId, false)
     this.connect()
   }
 }

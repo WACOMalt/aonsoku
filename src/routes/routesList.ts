@@ -75,6 +75,11 @@ const GENRE = {
 
 const SERVER_CONFIG = '/server-config'
 
+const JAM = {
+  JOIN: (sessionId: string) => `/jam/${sessionId}`,
+  PATH: '/jam/:sessionId',
+}
+
 export const ROUTES = {
   LIBRARY,
   ARTIST,
@@ -87,4 +92,5 @@ export const ROUTES = {
   EPISODES,
   GENRE,
   SERVER_CONFIG,
+  JAM,
 }
