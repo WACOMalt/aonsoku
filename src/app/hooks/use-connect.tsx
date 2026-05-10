@@ -4,10 +4,9 @@ import { useAppStore } from '@/store/app.store'
 
 export function useConnect() {
   const username = useAppStore((s) => s.data.username)
-  const isServerConfigured = useAppStore((s) => s.data.isServerConfigured)
 
   useEffect(() => {
-    if (username && isServerConfigured) {
+    if (username) {
       connectService.connect()
     }
 
@@ -15,5 +14,5 @@ export function useConnect() {
       // Don't disconnect on unmount — the connection should persist
       // Only disconnect on explicit logout
     }
-  }, [username, isServerConfigured])
+  }, [username])
 }
