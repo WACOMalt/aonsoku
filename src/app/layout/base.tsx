@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { MainDrawerPage } from '@/app/components/drawer/page'
 import { FullscreenMode } from '@/app/components/fullscreen/page'
+import { JamJoinPrompt } from '@/app/components/player/jam-join-prompt'
 import { Player } from '@/app/components/player/player'
 import { CreatePlaylistDialog } from '@/app/components/playlist/form-dialog'
 import { RemovePlaylistDialog } from '@/app/components/playlist/remove-dialog'
@@ -10,6 +11,7 @@ import {
   MainSidebarInset,
   MainSidebarProvider,
 } from '@/app/components/ui/main-sidebar'
+import { useConnect } from '@/app/hooks/use-connect'
 import { Header } from '@/app/layout/header'
 import { MainRoutes } from './main'
 
@@ -21,6 +23,8 @@ const MemoMainDrawerPage = memo(MainDrawerPage)
 const MemoFullscreenMode = memo(FullscreenMode)
 
 export default function BaseLayout() {
+  useConnect()
+
   return (
     <div className="h-screen w-screen overflow-hidden">
       <MainSidebarProvider>
@@ -36,6 +40,7 @@ export default function BaseLayout() {
       <MemoMainDrawerPage />
       <CreatePlaylistDialog />
       <MemoFullscreenMode />
+      <JamJoinPrompt />
     </div>
   )
 }

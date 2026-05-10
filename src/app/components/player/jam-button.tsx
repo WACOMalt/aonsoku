@@ -80,7 +80,7 @@ export function JamButton() {
 
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Spotify-style Jam</DialogTitle>
+          <DialogTitle>Music Jam</DialogTitle>
         </DialogHeader>
 
         <div className="flex flex-col gap-4 py-4">

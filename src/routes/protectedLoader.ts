@@ -2,14 +2,30 @@ import { redirect } from 'react-router-dom'
 import { ROUTES } from '@/routes/routesList'
 import { subsonic } from '@/service/subsonic'
 import { useAppStore } from '@/store/app.store'
+import { useJamStore } from '@/store/jam.store'
+
+/**
+ * Check if the current URL hash contains a jam invite path (e.g. #/jam/abc1234)
+ * and persist the session ID so we can prompt the user to join after login.
+ */
+function savePendingJamSessionId() {
+  const hash = window.location.hash || ''
+  const jamMatch = hash.match(/#\/jam\/(.+)/)
+  if (jamMatch) {
+    useJamStore.getState().actions.setPendingJamSessionId(jamMatch[1])
+  }
+}
 
 export async function protectedLoader() {
   const { url, password, isServerConfigured } = useAppStore.getState().data
   const hasNoUrl = !url || url === ''
   const hasNoToken = !password || password === ''
 
-  if (hasNoUrl || hasNoToken || !isServerConfigured)
+  if (hasNoUrl || hasNoToken || !isServerConfigured) {
+    // Save pending jam session ID before redirecting to login
+    savePendingJamSessionId()
     return redirect(ROUTES.SERVER_CONFIG)
+  }
 
   const isServerUp = await subsonic.ping.pingView()
   if (!isServerUp) return redirect(ROUTES.SERVER_CONFIG)

@@ -18,6 +18,7 @@ import { ISong } from '@/types/responses/song'
 import { areSongListsEqual } from '@/utils/compareSongLists'
 import { isDesktop } from '@/utils/desktop'
 import { discordRpc } from '@/utils/discordRpc'
+import { connectService } from '@/service/connect'
 import { jamService } from '@/service/jam'
 import { addNextSongList, shuffleSongList } from '@/utils/songListFunctions'
 import { idbStorage } from './idb'
@@ -1376,9 +1377,9 @@ export const useIsSingleSongPlaying = (songId: string) => {
   }
 }
 
-// Jam Syncing Subscriptions
+// Jam + Connect Syncing Subscriptions
 // 1. Immediate emit on play/pause or song change — these must never be throttled.
-//    Guard with jamService.isSyncing to prevent feedback loops when handleRemoteSync
+//    Guard with isSyncing flags to prevent feedback loops when handleRemoteSync
 //    itself changes the song/play state.
 usePlayerStore.subscribe(
   (state) => ({
@@ -1386,8 +1387,12 @@ usePlayerStore.subscribe(
     isPlaying: state.playerState.isPlaying,
   }),
   () => {
-    if (jamService.isSyncing) return
-    jamService.emitPlaybackState()
+    if (!jamService.isSyncing) {
+      jamService.emitPlaybackState()
+    }
+    if (!connectService.isSyncing) {
+      connectService.emitPlaybackState()
+    }
   },
   {
     equalityFn: shallow,
@@ -1403,10 +1408,14 @@ usePlayerStore.subscribe(
     currentList: state.songlist.currentList,
   }),
   () => {
-    if (jamService.isSyncing) return
     const now = Date.now()
     if (now - lastProgressEmit > 1000) {
-      jamService.emitPlaybackState()
+      if (!jamService.isSyncing) {
+        jamService.emitPlaybackState()
+      }
+      if (!connectService.isSyncing) {
+        connectService.emitPlaybackState()
+      }
       lastProgressEmit = now
     }
   },

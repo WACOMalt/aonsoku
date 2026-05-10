@@ -12,6 +12,8 @@ import {
   AlertDialogTitle,
 } from '@/app/components/ui/alert-dialog'
 import { ROUTES } from '@/routes/routesList'
+import { connectService } from '@/service/connect'
+import { jamService } from '@/service/jam'
 import { useAppActions, useAppStore } from '@/store/app.store'
 import { usePlayerActions } from '@/store/player.store'
 
@@ -34,6 +36,9 @@ export function LogoutConfirmDialog({
 
   function handleRemoveConfig(e: MouseEvent<HTMLButtonElement>) {
     e.preventDefault()
+    // Disconnect from jam and connect services before clearing state
+    jamService.disconnect()
+    connectService.disconnect()
     removeConfig()
     clearPlayerState()
     resetConfig()

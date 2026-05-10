@@ -1,6 +1,5 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { jamService } from '@/service/jam'
 import { useJamStore } from '@/store/jam.store'
 import { ROUTES } from '@/routes/routesList'
 
@@ -21,8 +20,8 @@ export default function JamJoin() {
       return
     }
 
-    // Join the session then redirect to home where the player lives
-    jamService.joinSession(sessionId)
+    // Set the pending session ID — the JamJoinPrompt will show the confirmation dialog
+    useJamStore.getState().actions.setPendingJamSessionId(sessionId)
     navigate(ROUTES.LIBRARY.HOME, { replace: true })
   }, [sessionId, navigate])
 

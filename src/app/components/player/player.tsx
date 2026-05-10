@@ -32,6 +32,8 @@ import { PlayerProgress } from './progress'
 import { PlayerQueueButton } from './queue-button'
 import { PlayerVolume } from './volume'
 import { JamButton } from './jam-button'
+import { DevicePicker } from './device-picker'
+import { ControllerBanner } from './controller-banner'
 
 const MemoTrackInfo = memo(TrackInfo)
 const MemoRadioInfo = memo(RadioInfo)
@@ -43,6 +45,8 @@ const MemoPlayerQueueButton = memo(PlayerQueueButton)
 const MemoPlayerClearQueueButton = memo(PlayerClearQueueButton)
 const MemoPlayerVolume = memo(PlayerVolume)
 const MemoJamButton = memo(JamButton)
+const MemoDevicePicker = memo(DevicePicker)
+const MemoControllerBanner = memo(ControllerBanner)
 const MemoPlayerExpandButton = memo(PlayerExpandButton)
 const MemoPodcastPlaybackRate = memo(PodcastPlaybackRate)
 const MemoLyricsButton = memo(PlayerLyricsButton)
@@ -190,6 +194,8 @@ export function Player() {
   }, [song, replayGainDefaultGain, replayGainPreAmp, replayGainType])
 
   return (
+    <>
+    <MemoControllerBanner />
     <footer className="border-t h-[--player-height] w-full flex items-center fixed bottom-0 left-0 right-0 z-40 bg-background">
       <div className="w-full h-full grid grid-cols-player gap-2 px-4">
         {/* Track Info */}
@@ -227,6 +233,7 @@ export function Player() {
             )}
 
             <MemoJamButton />
+            <MemoDevicePicker />
 
             <MemoPlayerVolume
               audioRef={getAudioRef()}
@@ -287,5 +294,6 @@ export function Player() {
         />
       )}
     </footer>
+    </>
   )
 }
