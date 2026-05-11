@@ -19,9 +19,14 @@ import { PopoverVolume } from './popover-volume'
 interface PlayerVolumeProps {
   disabled: boolean
   audioRef: RefObject<HTMLAudioElement>
+  vertical?: boolean
 }
 
-export function PlayerVolume({ disabled, audioRef }: PlayerVolumeProps) {
+export function PlayerVolume({
+  disabled,
+  audioRef,
+  vertical,
+}: PlayerVolumeProps) {
   const { t } = useTranslation()
   const { volume, handleVolumeWheel } = usePlayerVolume()
   const { useAudioHotkeys } = usePlayerHotkeys()
@@ -43,7 +48,7 @@ export function PlayerVolume({ disabled, audioRef }: PlayerVolumeProps) {
   return (
     <div className={clsx(disabled && 'opacity-50')}>
       <div className="flex 2xl:hidden">
-        <PopoverVolume>
+        <PopoverVolume vertical={vertical}>
           <VolumeIcon volume={volume} size={18} />
         </PopoverVolume>
       </div>

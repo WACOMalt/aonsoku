@@ -7,7 +7,15 @@ import {
 } from '@/app/components/ui/popover'
 import { VolumeSlider } from './volume'
 
-export function PopoverVolume({ children }: { children: ReactNode }) {
+interface PopoverVolumeProps {
+  children: ReactNode
+  vertical?: boolean
+}
+
+export function PopoverVolume({
+  children,
+  vertical = false,
+}: PopoverVolumeProps) {
   return (
     <Popover>
       <PopoverTrigger asChild>
@@ -18,13 +26,25 @@ export function PopoverVolume({ children }: { children: ReactNode }) {
           {children}
         </Button>
       </PopoverTrigger>
-      <PopoverContent
-        className="w-fit h-10 px-4 py-0 flex items-center rounded-full"
-        side="left"
-        align="center"
-      >
-        <VolumeSlider className="w-24" />
-      </PopoverContent>
+      {vertical ? (
+        <PopoverContent
+          className="w-10 h-28 px-0 py-3 flex items-center justify-center rounded-full"
+          side="top"
+          align="center"
+        >
+          <div className="h-full flex items-center justify-center -rotate-90">
+            <VolumeSlider className="w-20" />
+          </div>
+        </PopoverContent>
+      ) : (
+        <PopoverContent
+          className="w-fit h-10 px-4 py-0 flex items-center rounded-full"
+          side="left"
+          align="center"
+        >
+          <VolumeSlider className="w-24" />
+        </PopoverContent>
+      )}
     </Popover>
   )
 }

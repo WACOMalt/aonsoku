@@ -345,6 +345,7 @@ export function Player() {
                 <MemoPlayerVolume
                   audioRef={getAudioRef()}
                   disabled={!song && !radio && !podcast}
+                  vertical
                 />
               </div>
             </div>
