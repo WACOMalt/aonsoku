@@ -51,8 +51,8 @@ export function FullscreenProgress() {
   const currentTime = convertSecondsToTime(isSeeking ? localProgress : progress)
 
   return (
-    <div className="flex items-center gap-3">
-      <div className="min-w-[50px] max-w-[60px] text-right drop-shadow-lg">
+    <div className="flex items-center gap-2 md:gap-3">
+      <div className="min-w-[40px] md:min-w-[50px] max-w-[50px] md:max-w-[60px] text-right drop-shadow-lg text-xs md:text-sm">
         {currentTime}
       </div>
 
@@ -70,7 +70,7 @@ export function FullscreenProgress() {
         onMouseUp={handleSeekedFallback}
       />
 
-      <div className="min-w-[50px] max-w-[60px] text-left drop-shadow-lg">
+      <div className="min-w-[40px] md:min-w-[50px] max-w-[50px] md:max-w-[60px] text-left drop-shadow-lg text-xs md:text-sm">
         {convertSecondsToTime(currentDuration ?? 0)}
       </div>
     </div>

@@ -46,7 +46,7 @@ const getTransform = (currentTab: TabValue, tabValue: TabValue) => {
 }
 
 const tabStyles =
-  'absolute inset-0 mt-0 h-[calc(100%-64px)] overflow-y-auto transition-transform duration-300'
+  'absolute inset-0 mt-0 h-[calc(100%-48px)] md:h-[calc(100%-64px)] overflow-y-auto transition-transform duration-300'
 
 const triggerStyles =
   'w-full data-[state=active]:bg-foreground data-[state=active]:text-secondary text-foreground drop-shadow-sm'
@@ -61,7 +61,7 @@ export function FullscreenTabs() {
       onValueChange={(value) => setTab(value as TabValue)}
       className="w-full h-full min-h-full"
     >
-      <TabsList className="w-full bg-foreground/20 mb-4">
+      <TabsList className="w-full bg-foreground/20 mb-2 md:mb-4">
         <TabsTrigger value={TabsEnum.Queue} className={triggerStyles}>
           {t('fullscreen.queue')}
         </TabsTrigger>

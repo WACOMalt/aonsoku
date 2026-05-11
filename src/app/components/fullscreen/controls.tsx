@@ -108,13 +108,13 @@ export function FullscreenControls() {
 }
 
 export const buttonsStyle = {
-  main: 'w-14 h-14 rounded-full shadow-lg bg-secondary-foreground hover:scale-105 transition-transform will-change-transform',
-  mainIcon: 'w-6 h-6 text-secondary fill-secondary',
+  main: 'w-11 h-11 md:w-14 md:h-14 rounded-full shadow-lg bg-secondary-foreground hover:scale-105 transition-transform will-change-transform',
+  mainIcon: 'w-5 h-5 md:w-6 md:h-6 text-secondary fill-secondary',
   secondary:
-    'relative w-12 h-12 rounded-full text-secondary-foreground hover:text-secondary-foreground data-[state=active]:text-primary hover:bg-transparent hover:scale-110 transition-transform will-change-transform',
-  secondaryIcon: 'w-6 h-6 drop-shadow-lg',
+    'relative w-10 h-10 md:w-12 md:h-12 rounded-full text-secondary-foreground hover:text-secondary-foreground data-[state=active]:text-primary hover:bg-transparent hover:scale-110 transition-transform will-change-transform',
+  secondaryIcon: 'w-5 h-5 md:w-6 md:h-6 drop-shadow-lg',
   secondaryIconFilled:
-    'w-6 h-6 text-secondary-foreground fill-secondary-foreground drop-shadow-lg',
+    'w-5 h-5 md:w-6 md:h-6 text-secondary-foreground fill-secondary-foreground drop-shadow-lg',
   activeDot: 'player-button-active',
   style: {
     backfaceVisibility: 'hidden' as const,
