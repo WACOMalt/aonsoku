@@ -1,4 +1,4 @@
-import { AudioLines, Pause, Play, RadioIcon, SkipForward } from 'lucide-react'
+import { AudioLines, Pause, Play, RadioIcon } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import { LazyLoadImage } from 'react-lazy-load-image-component'
 import { getSongStreamUrl } from '@/api/httpClient'
@@ -71,7 +71,6 @@ export function Player() {
     getCurrentProgress,
     getCurrentPodcastProgress,
     togglePlayPause,
-    playNextSong,
   } = usePlayerActions()
   const { currentList, currentSongIndex, radioList, podcastList } =
     usePlayerSonglist()
@@ -284,8 +283,13 @@ export function Player() {
             )}
           </div>
 
-          {/* Play/Pause + Next */}
-          <div className="flex items-center gap-1">
+          {/* Heart + Device + Play/Pause */}
+          <div
+            className="flex items-center gap-0.5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isSong && <MemoPlayerLikeButton disabled={!song} />}
+            <MemoDevicePicker />
             <button
               onClick={togglePlayPause}
               disabled={!song && !radio && !isPodcast}
@@ -296,13 +300,6 @@ export function Player() {
               ) : (
                 <Play className="size-5 fill-foreground" />
               )}
-            </button>
-            <button
-              onClick={playNextSong}
-              disabled={!song && !radio && !podcast}
-              className="size-8 flex items-center justify-center rounded-full hover:bg-accent disabled:opacity-50"
-            >
-              <SkipForward className="size-4 fill-foreground" />
             </button>
           </div>
         </div>
