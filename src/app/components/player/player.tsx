@@ -341,6 +341,12 @@ export function Player() {
               >
                 <SkipForward className="size-4 fill-current" />
               </button>
+              <div className="[&_button]:!size-7 [&_button]:!p-0 [&_button_svg]:!size-3.5">
+                <MemoPlayerVolume
+                  audioRef={getAudioRef()}
+                  disabled={!song && !radio && !podcast}
+                />
+              </div>
             </div>
           </div>
 
@@ -351,10 +357,6 @@ export function Player() {
             {isSong && <MemoLyricsButton disabled={!song} />}
             <MemoJamButton />
             <MemoDevicePicker />
-            <MemoPlayerVolume
-              audioRef={getAudioRef()}
-              disabled={!song && !radio && !podcast}
-            />
             {isSong && (
               <button
                 disabled={!song || isPlayingOneSong() || !hasNext}
