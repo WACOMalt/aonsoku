@@ -22,6 +22,7 @@ export function FullscreenPlayer() {
           </div>
           <div className="flex items-center gap-1">
             <LikeButton />
+            <VolumeContainer />
           </div>
         </div>
       </div>

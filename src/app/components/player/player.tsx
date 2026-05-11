@@ -351,6 +351,10 @@ export function Player() {
             {isSong && <MemoLyricsButton disabled={!song} />}
             <MemoJamButton />
             <MemoDevicePicker />
+            <MemoPlayerVolume
+              audioRef={getAudioRef()}
+              disabled={!song && !radio && !podcast}
+            />
             {isSong && (
               <button
                 disabled={!song || isPlayingOneSong() || !hasNext}
