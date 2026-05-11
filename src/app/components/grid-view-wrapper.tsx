@@ -37,6 +37,7 @@ export function GridViewWrapper<T>({
 }: GridViewWrapperProps<T>) {
   const scrollDivRef = useRef<HTMLDivElement | null>(null)
   const [gridColumnsSize, setGridColumnsSize] = useState(4)
+  const [currentPadding, setCurrentPadding] = useState(padding)
   const [size, setSize] = useState({
     width: defaultWidth,
     height: defaultWidth + titleHeight,
@@ -62,7 +63,7 @@ export function GridViewWrapper<T>({
 
     const pageWidth = scrollDivRef.current.offsetWidth
     const gapsDifference = (gridColumnsSize - 1) * gap
-    const bothSidesPaddingSize = padding * 2
+    const bothSidesPaddingSize = currentPadding * 2
     const remainSpace = pageWidth - bothSidesPaddingSize - gapsDifference
 
     const width = remainSpace / gridColumnsSize
@@ -72,7 +73,7 @@ export function GridViewWrapper<T>({
       width,
       height,
     }
-  }, [defaultWidth, gap, gridColumnsSize, padding, titleHeight])
+  }, [defaultWidth, gap, gridColumnsSize, currentPadding, titleHeight])
 
   useLayoutEffect(() => {
     scrollDivRef.current = getMainScrollElement()
@@ -84,8 +85,20 @@ export function GridViewWrapper<T>({
         setGridColumnsSize(8) // 2xl breakpoint
       } else if (width >= 1024) {
         setGridColumnsSize(6) // lg breakpoint
+      } else if (width >= 768) {
+        setGridColumnsSize(4) // md breakpoint
+        setCurrentPadding(padding) // desktop padding
+      } else if (width >= 640) {
+        setGridColumnsSize(3) // sm breakpoint
+        setCurrentPadding(16) // mobile padding
       } else {
-        setGridColumnsSize(4) // default size
+        setGridColumnsSize(2) // mobile
+        setCurrentPadding(16) // mobile padding
+      }
+
+      // Ensure desktop padding for larger screens
+      if (width >= 768) {
+        setCurrentPadding(padding)
       }
 
       const newSize = calculateSize()
@@ -125,7 +138,7 @@ export function GridViewWrapper<T>({
     rows,
     size,
     padding: {
-      x: padding,
+      x: currentPadding,
     },
     gap,
     overscan: 5,

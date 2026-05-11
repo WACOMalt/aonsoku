@@ -28,6 +28,7 @@ module.exports = {
         'shadow-header': 'var(--shadow-header-height)',
         'shadow-header-distance': 'var(--shadow-header-distance)',
         toast: 'var(--toastify-toast-container-height)',
+        'bottom-nav': 'var(--bottom-nav-height, 0px)',
       },
       colors: {
         border: 'hsl(var(--border))',
@@ -108,10 +109,12 @@ module.exports = {
       gridTemplateColumns: {
         player:
           'minmax(250px, 1fr) minmax(0px, 1fr) minmax(0px, 1fr) minmax(250px, 1fr)',
+        'player-mobile': '1fr',
         'table-fallback':
           'minmax(40px, 50px) minmax(0px, 3fr) minmax(0px, 2fr) minmax(0px, 1fr) minmax(0px, 1fr) minmax(0px, 1fr) minmax(60px, 70px) minmax(100px, 120px)',
         header:
           'minmax(180px, 1fr) minmax(0px, 1fr) minmax(0px, 1fr) minmax(180px, 1fr)',
+        'header-mobile': '1fr auto',
         'mid-player-info': 'minmax(40px, 70px) minmax(168px, 1fr)',
         'mini-player': 'minmax(30px, 40px) minmax(80px, 1fr) 64px',
       },

@@ -98,6 +98,7 @@ export function songsColumns(): ColumnDefType<ISong>[] {
         width: '20%',
         maxWidth: '20%',
       },
+      className: 'hidden md:flex',
       enableSorting: true,
       sortingFn: 'customSortFn',
       header: ({ column, table }) => (
@@ -156,6 +157,7 @@ export function songsColumns(): ColumnDefType<ISong>[] {
         width: 80,
         maxWidth: 80,
       },
+      className: 'hidden lg:flex',
     },
     {
       id: 'duration',

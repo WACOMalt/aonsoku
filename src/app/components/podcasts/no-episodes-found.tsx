@@ -5,7 +5,7 @@ export function NoEpisodesFound() {
   const { t } = useTranslation()
 
   return (
-    <div className="w-full px-8 mt-4">
+    <div className="w-full px-4 md:px-8 mt-4">
       <div className="w-full h-64 flex flex-col items-center justify-center gap-2 text-muted-foreground border border-dashed rounded-md">
         <div className="relative flex items-center justify-center">
           <SlashIcon className="w-6 h-6 rotate-90 absolute" />

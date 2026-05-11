@@ -17,7 +17,7 @@ export function EpisodesFilters() {
   const { t } = useTranslation()
 
   return (
-    <div className="px-8 h-16 flex items-center justify-between">
+    <div className="px-4 md:px-8 h-16 flex items-center justify-between">
       <h2 className="text-xl font-semibold">{t('podcasts.list.episodes')}</h2>
 
       <div className="flex gap-2">

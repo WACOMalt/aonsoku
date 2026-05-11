@@ -58,7 +58,7 @@ export function HeaderItem({ song }: { song: ISong }) {
               <BlurredCanvas src={src} blur={16} className="scale-110" />
             </div>
             <div className="w-full h-full absolute z-10 bg-gradient-to-b from-transparent to-background-foreground">
-              <div className="flex h-full px-8 py-6 gap-4">
+              <div className="flex h-full px-4 md:px-8 py-6 gap-4">
                 <div
                   className="h-full aspect-square relative group bg-skeleton rounded-lg"
                   data-testid="header-image-container"

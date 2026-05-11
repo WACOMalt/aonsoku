@@ -156,7 +156,8 @@ function MainSidebarProvider({
             } as React.CSSProperties
           }
           className={cn(
-            'group/sidebar-wrapper has-data-[variant=inset]:bg-background flex pt-header pb-player w-full h-full',
+            'group/sidebar-wrapper has-data-[variant=inset]:bg-background flex pt-header pb-player md:pb-player w-full h-full',
+            'max-md:pb-[calc(var(--player-height)+var(--bottom-nav-height))]',
             className,
           )}
           {...props}
@@ -337,7 +338,7 @@ function MainSidebarInset({
     <main
       data-slot="sidebar-inset"
       className={cn(
-        'bg-background relative flex w-[calc(100%-var(--sidebar-width))] flex-1 flex-col',
+        'bg-background relative flex w-full md:w-[calc(100%-var(--sidebar-width))] flex-1 flex-col',
         'md:peer-data-[variant=inset]:m-2 md:peer-data-[variant=inset]:ml-0',
         'md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow-sm',
         'md:peer-data-[variant=inset]:peer-data-[state=collapsed]:ml-2',

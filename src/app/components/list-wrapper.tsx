@@ -9,7 +9,7 @@ const ListWrapper = forwardRef<HTMLDivElement, ListWrapperProps>(
       <div
         ref={ref}
         className={cn(
-          'w-full px-8 py-6 bg-transparent relative z-0',
+          'w-full px-4 md:px-8 py-6 bg-transparent relative z-0',
           className,
         )}
         {...props}

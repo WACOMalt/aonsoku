@@ -36,7 +36,7 @@ export function LatestEpisodesFallback() {
     <div className="w-full">
       <ShadowHeaderFallback />
       <ListWrapper className="px-4 pt-6">
-        <div className="grid grid-cols-5 gap-4 px-4 mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 px-4 mb-6">
           {Array.from({ length: 5 }).map((_, index) => (
             <FeaturedEpisodeCardFallback key={index} />
           ))}
@@ -94,9 +94,9 @@ interface PodcastHeaderProps {
 
 export function PodcastHeaderFallback({ podcast = true }: PodcastHeaderProps) {
   return (
-    <div className="w-full px-8 py-6 flex gap-4">
-      <Skeleton className="rounded w-[200px] h-[200px] min-w-[200px] min-h-[200px] 2xl:w-[250px] 2xl:h-[250px] 2xl:min-w-[250px] 2xl:min-h-[250px] aspect-square" />
-      <div className="flex flex-col justify-end w-full">
+    <div className="w-full px-4 md:px-8 py-6 flex flex-col items-center md:flex-row md:items-end gap-4">
+      <Skeleton className="rounded w-[150px] h-[150px] min-w-[150px] min-h-[150px] md:w-[200px] md:h-[200px] md:min-w-[200px] md:min-h-[200px] 2xl:w-[250px] 2xl:h-[250px] 2xl:min-w-[250px] 2xl:min-h-[250px] aspect-square" />
+      <div className="flex flex-col justify-end w-full text-center md:text-left">
         <Skeleton className="h-12 w-3/5 mb-3" />
         <Skeleton className="h-6 w-2/6 mb-3" />
         <Separator className={clsx(!podcast && 'mb-3')} />
@@ -116,7 +116,7 @@ export function PodcastHeaderFallback({ podcast = true }: PodcastHeaderProps) {
 
 export function PodcastFiltersFallback() {
   return (
-    <div className="px-8 h-16 flex items-center justify-between">
+    <div className="px-4 md:px-8 h-16 flex items-center justify-between">
       <Skeleton className="h-7 w-28" />
 
       <div className="flex gap-2">

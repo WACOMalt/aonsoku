@@ -18,11 +18,13 @@ export function HeaderSongInfo() {
   }
 
   return (
-    <div className="col-span-2 flex justify-center items-center">
+    <div className="md:col-span-2 flex justify-center items-center min-w-0">
       {isPlaylistEmpty && <AppTitle />}
       {!isPlaylistEmpty && (
-        <div className="flex w-full justify-center subpixel-antialiased font-medium text-sm text-muted-foreground">
-          <p className="leading-7 mr-1">{formatSongCount()}</p>
+        <div className="flex w-full justify-center subpixel-antialiased font-medium text-sm text-muted-foreground min-w-0">
+          <p className="leading-7 mr-1 shrink-0 hidden md:block">
+            {formatSongCount()}
+          </p>
           <p className="leading-7 truncate">{getCurrentSongInfo()}</p>
         </div>
       )}

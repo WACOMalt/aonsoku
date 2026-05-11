@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { MainDrawerPage } from '@/app/components/drawer/page'
 import { FullscreenMode } from '@/app/components/fullscreen/page'
+import { MobileBottomNav } from '@/app/components/mobile/bottom-nav'
 import { JamJoinPrompt } from '@/app/components/player/jam-join-prompt'
 import { Player } from '@/app/components/player/player'
 import { CreatePlaylistDialog } from '@/app/components/playlist/form-dialog'
@@ -21,6 +22,7 @@ const MemoSongInfoDialog = memo(SongInfoDialog)
 const MemoRemovePlaylistDialog = memo(RemovePlaylistDialog)
 const MemoMainDrawerPage = memo(MainDrawerPage)
 const MemoFullscreenMode = memo(FullscreenMode)
+const MemoMobileBottomNav = memo(MobileBottomNav)
 
 export default function BaseLayout() {
   useConnect()
@@ -34,6 +36,7 @@ export default function BaseLayout() {
           <MainRoutes />
         </MainSidebarInset>
         <MemoPlayer />
+        <MemoMobileBottomNav />
       </MainSidebarProvider>
       <MemoSongInfoDialog />
       <MemoRemovePlaylistDialog />

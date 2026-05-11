@@ -22,7 +22,7 @@ export function GenreFallback() {
           <Skeleton className="rounded-full h-9 w-36" />
         </div>
       </ListWrapper>
-      <ListWrapper className="px-8 pt-0">
+      <ListWrapper className="px-4 md:px-8 pt-0">
         <MainGrid>
           {Array.from({ length: 24 }).map((_, index) => (
             <div key={'genre-card-fallback-' + index}>

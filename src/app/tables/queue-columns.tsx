@@ -49,6 +49,7 @@ export function queueColumns(): ColumnDefType<ISong>[] {
         width: '30%',
         maxWidth: '30%',
       },
+      className: 'hidden md:flex',
       header: '',
       cell: ({ row }) => {
         const { artist, artistId, artists } = row.original

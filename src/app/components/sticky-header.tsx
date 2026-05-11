@@ -97,7 +97,7 @@ export function StickyHeader({
         <div className="w-full h-shadow-header bg-background/50">
           <div
             className={cn(
-              'flex items-center gap-4 w-full h-shadow-header px-8 transition-opacity duration-500 delay-150',
+              'flex items-center gap-4 w-full h-shadow-header px-4 md:px-8 transition-opacity duration-500 delay-150',
               contentClassName,
             )}
             style={{ opacity: contentOpacity }}

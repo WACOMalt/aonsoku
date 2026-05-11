@@ -10,18 +10,31 @@ export function Header() {
   const { isFullscreen } = useAppWindow()
 
   return (
-    <header className="w-full grid grid-cols-header h-header px-4 fixed top-0 right-0 left-0 z-20 bg-background border-b electron-drag">
-      <div className="flex items-center">
-        {isMacOS && !isFullscreen && <div className="w-[70px]" />}
-        <NavigationButtons />
-        <MainSidebarTrigger className="ml-2" />
+    <header className="w-full h-header fixed top-0 right-0 left-0 z-20 bg-background border-b electron-drag">
+      {/* Desktop header layout */}
+      <div className="hidden md:grid grid-cols-header h-full px-4">
+        <div className="flex items-center">
+          {isMacOS && !isFullscreen && <div className="w-[70px]" />}
+          <NavigationButtons />
+          <MainSidebarTrigger className="ml-2" />
+        </div>
+        <HeaderSongInfo />
+        <div className="flex justify-end items-center gap-2">
+          <SettingsButton />
+          <UserDropdown />
+          {isWindows && !isFullscreen && <div className="w-[122px]" />}
+          {isLinux && !isFullscreen && <div className="w-[94px]" />}
+        </div>
       </div>
-      <HeaderSongInfo />
-      <div className="flex justify-end items-center gap-2">
+
+      {/* Mobile header layout */}
+      <div className="flex md:hidden items-center gap-2 px-3 h-full">
+        <MainSidebarTrigger />
+        <div className="flex-1 min-w-0">
+          <HeaderSongInfo />
+        </div>
         <SettingsButton />
         <UserDropdown />
-        {isWindows && !isFullscreen && <div className="w-[122px]" />}
-        {isLinux && !isFullscreen && <div className="w-[94px]" />}
       </div>
     </header>
   )
