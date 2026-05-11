@@ -28,12 +28,16 @@ const Slider = React.forwardRef<
   }
 
   const [showTooltip, setShowTooltip] = React.useState(false)
+  const isVertical = props.orientation === 'vertical'
 
   return (
     <SliderPrimitive.Root
       ref={ref}
       className={cn(
-        'relative h-3 flex w-full touch-none select-none items-center cursor-pointer',
+        'relative flex touch-none select-none cursor-pointer',
+        isVertical
+          ? 'flex-col w-3 h-full items-center'
+          : 'h-3 w-full items-center',
         className,
       )}
       onMouseEnter={() => setShowTooltip(true)}
@@ -42,7 +46,8 @@ const Slider = React.forwardRef<
     >
       <SliderPrimitive.Track
         className={clsx(
-          'relative h-1 w-full grow overflow-hidden rounded-full select-none',
+          'relative grow overflow-hidden rounded-full select-none',
+          isVertical ? 'w-1 h-full' : 'h-1 w-full',
           variant === 'default' && 'bg-secondary',
           variant === 'secondary' && 'bg-muted-foreground/70',
         )}
@@ -50,7 +55,8 @@ const Slider = React.forwardRef<
       >
         <SliderPrimitive.Range
           className={clsx(
-            'absolute h-full select-none rounded',
+            'absolute select-none rounded',
+            isVertical ? 'w-full' : 'h-full',
             variant === 'default' && 'bg-primary',
             variant === 'secondary' && 'bg-secondary-foreground',
           )}
@@ -63,6 +69,7 @@ const Slider = React.forwardRef<
         variant={variant}
         value={tooltipValue ?? ''}
         align="center"
+        side={isVertical ? 'right' : undefined}
       >
         <SliderPrimitive.Thumb
           className={clsx(
