@@ -1,8 +1,19 @@
-import { AudioLines, Pause, Play, RadioIcon } from 'lucide-react'
+import clsx from 'clsx'
+import {
+  AudioLines,
+  Pause,
+  Play,
+  RadioIcon,
+  Repeat,
+  Shuffle,
+  SkipBack,
+  SkipForward,
+} from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import { LazyLoadImage } from 'react-lazy-load-image-component'
 import { getSongStreamUrl } from '@/api/httpClient'
 import { getProxyURL } from '@/api/podcastClient'
+import RepeatOne from '@/app/components/icons/repeat-one'
 import { ImageLoader } from '@/app/components/image-loader'
 import { MiniPlayerButton } from '@/app/components/mini-player/button'
 import { RadioInfo } from '@/app/components/player/radio-info'
@@ -16,8 +27,10 @@ import {
   usePlayerIsPlaying,
   usePlayerLoop,
   usePlayerMediaType,
+  usePlayerPrevAndNext,
   usePlayerProgress,
   usePlayerRef,
+  usePlayerShuffle,
   usePlayerSonglist,
   usePlayerStore,
   useReplayGainState,
@@ -71,12 +84,19 @@ export function Player() {
     getCurrentProgress,
     getCurrentPodcastProgress,
     togglePlayPause,
+    playPrevSong,
+    playNextSong,
+    isPlayingOneSong,
+    toggleShuffle,
+    toggleLoop,
   } = usePlayerActions()
   const { currentList, currentSongIndex, radioList, podcastList } =
     usePlayerSonglist()
   const isPlaying = usePlayerIsPlaying()
   const { isSong, isRadio, isPodcast } = usePlayerMediaType()
   const loopState = usePlayerLoop()
+  const isShuffleActive = usePlayerShuffle()
+  const { hasPrev, hasNext } = usePlayerPrevAndNext()
   const audioPlayerRef = usePlayerRef()
   const currentPlaybackRate = usePlayerStore().playerState.currentPlaybackRate
   const { replayGainType, replayGainPreAmp, replayGainDefaultGain } =
@@ -210,97 +230,159 @@ export function Player() {
     <>
       <MemoControllerBanner />
       <footer className="border-t h-[--player-height] w-full fixed bottom-0 left-0 right-0 z-40 bg-background">
-        {/* Mobile progress bar - thin line at top of footer */}
-        <div className="md:hidden h-1 bg-secondary">
-          <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-
-        {/* Mobile player layout */}
-        {/* biome-ignore lint: mobile-only tap handler, no keyboard needed */}
-        <div
-          className="grid md:hidden grid-cols-[auto_1fr_auto] items-center gap-2 px-3 h-[calc(var(--player-height)-4px)] cursor-pointer"
-          onClick={(e) => {
-            // Only expand if the click wasn't on a button
-            if ((e.target as HTMLElement).closest('button')) return
-            if (isSong && song) setIsFullscreen(true)
-          }}
-        >
-          {/* Cover art thumbnail */}
-          <div className="w-10 h-10 rounded overflow-hidden shrink-0 bg-muted flex items-center justify-center">
-            {isSong && song ? (
-              <ImageLoader id={song.coverArt} type="song" size={80}>
-                {(src) => (
-                  <LazyLoadImage
-                    src={src}
-                    width="100%"
-                    height="100%"
-                    className="aspect-square object-cover w-full h-full text-transparent"
-                    alt={`${song.artist} - ${song.title}`}
-                  />
-                )}
-              </ImageLoader>
-            ) : isRadio ? (
-              <RadioIcon className="w-5 h-5" strokeWidth={1} />
-            ) : isPodcast && podcast ? (
-              <LazyLoadImage
-                src={podcast.image_url}
-                width="100%"
-                height="100%"
-                className="aspect-square object-cover w-full h-full text-transparent"
-                alt={podcast.title}
-              />
-            ) : (
-              <AudioLines className="w-5 h-5" />
-            )}
+        {/* Mobile player - two rows */}
+        <div className="flex flex-col md:hidden h-[calc(var(--player-height)-1px)]">
+          {/* Progress bar */}
+          <div className="h-1 bg-secondary shrink-0">
+            <div
+              className="h-full bg-primary transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
 
-          {/* Song info */}
-          <div className="min-w-0">
-            {isSong && song ? (
-              <>
-                <p className="text-sm font-medium truncate">{song.title}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {song.artist}
-                </p>
-              </>
-            ) : isRadio && radio ? (
-              <>
-                <p className="text-sm font-medium truncate">{radio.name}</p>
-                <p className="text-xs text-muted-foreground truncate">Radio</p>
-              </>
-            ) : isPodcast && podcast ? (
-              <>
-                <p className="text-sm font-medium truncate">{podcast.title}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {podcast.podcast.title}
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">No song playing</p>
-            )}
-          </div>
-
-          {/* Heart + Device + Play/Pause */}
+          {/* Row 1: Main controls */}
+          {/* biome-ignore lint: mobile-only tap handler, no keyboard needed */}
           <div
-            className="flex items-center gap-0.5"
-            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-2 px-3 h-12 shrink-0 cursor-pointer"
+            onClick={(e) => {
+              if ((e.target as HTMLElement).closest('button')) return
+              if (isSong && song) setIsFullscreen(true)
+            }}
           >
-            {isSong && <MemoPlayerLikeButton disabled={!song} />}
-            <MemoDevicePicker />
-            <button
-              onClick={togglePlayPause}
-              disabled={!song && !radio && !isPodcast}
-              className="size-10 flex items-center justify-center rounded-full hover:bg-accent disabled:opacity-50"
-            >
-              {isPlaying ? (
-                <Pause className="size-5 fill-foreground" />
+            {/* Cover art thumbnail */}
+            <div className="w-10 h-10 rounded overflow-hidden shrink-0 bg-muted flex items-center justify-center">
+              {isSong && song ? (
+                <ImageLoader id={song.coverArt} type="song" size={80}>
+                  {(src) => (
+                    <LazyLoadImage
+                      src={src}
+                      width="100%"
+                      height="100%"
+                      className="aspect-square object-cover w-full h-full text-transparent"
+                      alt={`${song.artist} - ${song.title}`}
+                    />
+                  )}
+                </ImageLoader>
+              ) : isRadio ? (
+                <RadioIcon className="w-5 h-5" strokeWidth={1} />
+              ) : isPodcast && podcast ? (
+                <LazyLoadImage
+                  src={podcast.image_url}
+                  width="100%"
+                  height="100%"
+                  className="aspect-square object-cover w-full h-full text-transparent"
+                  alt={podcast.title}
+                />
               ) : (
-                <Play className="size-5 fill-foreground" />
+                <AudioLines className="w-5 h-5" />
               )}
-            </button>
+            </div>
+
+            {/* Title/Artist */}
+            <div className="flex-1 min-w-0">
+              {isSong && song ? (
+                <>
+                  <p className="text-sm font-medium truncate">{song.title}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {song.artist}
+                  </p>
+                </>
+              ) : isRadio && radio ? (
+                <>
+                  <p className="text-sm font-medium truncate">{radio.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    Radio
+                  </p>
+                </>
+              ) : isPodcast && podcast ? (
+                <>
+                  <p className="text-sm font-medium truncate">
+                    {podcast.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {podcast.podcast.title}
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">No song playing</p>
+              )}
+            </div>
+
+            {/* Transport controls */}
+            <div
+              className="flex items-center gap-0.5"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={playPrevSong}
+                disabled={!hasPrev || (!song && !radio && !podcast)}
+                className="size-8 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent disabled:opacity-50"
+              >
+                <SkipBack className="size-4 fill-current" />
+              </button>
+              <button
+                onClick={togglePlayPause}
+                disabled={!song && !radio && !isPodcast}
+                className="size-9 flex items-center justify-center rounded-full hover:bg-accent disabled:opacity-50"
+              >
+                {isPlaying ? (
+                  <Pause className="size-5 fill-foreground" />
+                ) : (
+                  <Play className="size-5 fill-foreground" />
+                )}
+              </button>
+              <button
+                onClick={playNextSong}
+                disabled={
+                  (!hasNext && loopState !== LoopState.All) ||
+                  (!song && !radio && !podcast)
+                }
+                className="size-8 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent disabled:opacity-50"
+              >
+                <SkipForward className="size-4 fill-current" />
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: Secondary controls - smaller */}
+          <div className="flex items-center justify-around px-3 h-8 shrink-0 [&_button]:!size-7 [&_button]:!p-0 [&_button_svg]:!size-3.5">
+            {isSong && <MemoPlayerLikeButton disabled={!song} />}
+            {isSong && <MemoPlayerQueueButton disabled={!song} />}
+            {isSong && <MemoLyricsButton disabled={!song} />}
+            <MemoJamButton />
+            <MemoDevicePicker />
+            {isSong && (
+              <button
+                disabled={!song || isPlayingOneSong() || !hasNext}
+                onClick={toggleShuffle}
+                className={clsx(
+                  'size-7 flex items-center justify-center rounded-full relative',
+                  isShuffleActive ? 'text-primary' : 'text-muted-foreground',
+                  (!song || isPlayingOneSong() || !hasNext) && 'opacity-50',
+                )}
+              >
+                <Shuffle className="size-3.5" />
+              </button>
+            )}
+            {isSong && (
+              <button
+                disabled={!song}
+                onClick={toggleLoop}
+                className={clsx(
+                  'size-7 flex items-center justify-center rounded-full relative',
+                  loopState !== LoopState.Off
+                    ? 'text-primary'
+                    : 'text-muted-foreground',
+                  !song && 'opacity-50',
+                )}
+              >
+                {loopState === LoopState.One ? (
+                  <RepeatOne className="size-3.5" size={14} />
+                ) : (
+                  <Repeat className="size-3.5" />
+                )}
+              </button>
+            )}
           </div>
         </div>
 
