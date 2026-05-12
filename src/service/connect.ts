@@ -1,10 +1,10 @@
 import { io, Socket } from 'socket.io-client'
-import { useConnectStore } from '@/store/connect.store'
 import { useAppStore } from '@/store/app.store'
-import { usePlayerStore } from '@/store/player.store'
+import { useConnectStore } from '@/store/connect.store'
 import { useJamStore } from '@/store/jam.store'
-import { getDeviceName } from '@/utils/deviceId'
+import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
+import { getDeviceName } from '@/utils/deviceId'
 
 class ConnectService {
   private socket: Socket | null = null
@@ -16,7 +16,11 @@ class ConnectService {
   }
 
   private get syncServerUrl() {
-    return window.location.origin
+    const origin = window.location.origin
+    if (origin.startsWith('http://') || origin.startsWith('https://')) {
+      return origin
+    }
+    return useAppStore.getState().data.url
   }
 
   connect() {
@@ -127,8 +131,7 @@ class ConnectService {
     const { isActivePlayer } = useConnectStore.getState()
     if (!isActivePlayer) return
 
-    const { songlist, playerState, playerProgress } =
-      usePlayerStore.getState()
+    const { songlist, playerState, playerProgress } = usePlayerStore.getState()
     const currentSong = songlist.currentSong
     if (!currentSong) return
 
@@ -279,8 +282,7 @@ class ConnectService {
           typeof (args as { position: number }).position === 'number'
         ) {
           const audio = usePlayerStore.getState().playerState.audioPlayerRef
-          if (audio)
-            audio.currentTime = (args as { position: number }).position
+          if (audio) audio.currentTime = (args as { position: number }).position
         }
         break
     }

@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client'
-import { useJamStore } from '@/store/jam.store'
 import { useAppStore } from '@/store/app.store'
+import { useJamStore } from '@/store/jam.store'
 import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
 
@@ -16,7 +16,11 @@ class JamService {
   }
 
   private get syncServerUrl() {
-    return window.location.origin
+    const origin = window.location.origin
+    if (origin.startsWith('http://') || origin.startsWith('https://')) {
+      return origin
+    }
+    return useAppStore.getState().data.url
   }
 
   private init() {
@@ -32,15 +36,20 @@ class JamService {
         // Never snap back while we are in the middle of applying a remote sync
         if (this._isSyncing) return
 
-        const { isConnected, isLead, canGuestsControl, lastLeadState } = useJamStore.getState()
+        const { isConnected, isLead, canGuestsControl, lastLeadState } =
+          useJamStore.getState()
         // Only act for connected guests who don't have control permission
         if (!isConnected || isLead || canGuestsControl) return
         // If there's a known lead state and the guest has drifted to a different song, snap back
-        if (lastLeadState && currentSongId && currentSongId !== lastLeadState.songId) {
+        if (
+          lastLeadState &&
+          currentSongId &&
+          currentSongId !== lastLeadState.songId
+        ) {
           console.log('[Jam] Guest drifted from lead song — snapping back')
           this.handleRemoteSync(lastLeadState)
         }
-      }
+      },
     )
   }
 
@@ -49,7 +58,8 @@ class JamService {
 
     const { id: sessionId, isLead } = useJamStore.getState()
     const { username } = useAppStore.getState().data
-    const { setConnected, setConnecting, setError, setParticipants } = useJamStore.getState().actions
+    const { setConnected, setConnecting, setError, setParticipants } =
+      useJamStore.getState().actions
 
     if (!sessionId || this.socket?.connected) return
 
@@ -57,7 +67,7 @@ class JamService {
 
     this.socket = io(this.syncServerUrl, {
       path: '/jam-sync/socket.io', // Proxy-compatible path
-      query: { sessionId, username, isLead: String(isLead) }
+      query: { sessionId, username, isLead: String(isLead) },
     })
 
     this.socket.on('connect', () => {
@@ -75,23 +85,29 @@ class JamService {
       setParticipants(participants)
     })
 
-    this.socket.on('sync_playback', (data: {
-      songId: string,
-      isPlaying: boolean,
-      progress: number,
-      timestamp: number,
-      queue?: ISong[]
-    }) => {
-      const { isLead, canGuestsControl } = useJamStore.getState()
-      // Lead only syncs from guests when canGuestsControl is enabled
-      if (isLead && !canGuestsControl) return
+    this.socket.on(
+      'sync_playback',
+      (data: {
+        songId: string
+        isPlaying: boolean
+        progress: number
+        timestamp: number
+        queue?: ISong[]
+      }) => {
+        const { isLead, canGuestsControl } = useJamStore.getState()
+        // Lead only syncs from guests when canGuestsControl is enabled
+        if (isLead && !canGuestsControl) return
 
-      this.handleRemoteSync(data)
-    })
+        this.handleRemoteSync(data)
+      },
+    )
 
-    this.socket.on('guest_control_update', ({ canGuestsControl }: { canGuestsControl: boolean }) => {
-      useJamStore.getState().actions.setCanGuestsControl(canGuestsControl)
-    })
+    this.socket.on(
+      'guest_control_update',
+      ({ canGuestsControl }: { canGuestsControl: boolean }) => {
+        useJamStore.getState().actions.setCanGuestsControl(canGuestsControl)
+      },
+    )
 
     this.socket.on('session_ended', () => {
       this.socket?.disconnect()
@@ -117,7 +133,7 @@ class JamService {
       isPlaying: playerState.isPlaying,
       progress: playerProgress.progress,
       queue: songlist.currentList,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     })
   }
 
@@ -146,10 +162,10 @@ class JamService {
   }
 
   private handleRemoteSync(data: {
-    songId: string,
-    isPlaying: boolean,
-    progress: number,
-    timestamp: number,
+    songId: string
+    isPlaying: boolean
+    progress: number
+    timestamp: number
     queue?: ISong[]
   }) {
     // Set flag so both the drift-correction subscriber AND the emit subscriber
@@ -169,34 +185,50 @@ class JamService {
       })
 
       // 1. Sync Queue if provided and different
-      if (data.queue && JSON.stringify(data.queue.map((s: ISong) => s.id)) !== JSON.stringify(songlist.currentList.map((s: ISong) => s.id))) {
+      if (
+        data.queue &&
+        JSON.stringify(data.queue.map((s: ISong) => s.id)) !==
+          JSON.stringify(songlist.currentList.map((s: ISong) => s.id))
+      ) {
         console.log('[Jam] Syncing shared queue')
-        const newIndex = data.queue.findIndex((s: ISong) => s.id === data.songId)
+        const newIndex = data.queue.findIndex(
+          (s: ISong) => s.id === data.songId,
+        )
         if (newIndex !== -1) {
-          usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
-            state.songlist.currentList = data.queue!
-            state.songlist.currentSongIndex = newIndex
-            state.songlist.currentSong = data.queue![newIndex]
-          })
+          usePlayerStore.setState(
+            (state: ReturnType<typeof usePlayerStore.getState>) => {
+              state.songlist.currentList = data.queue!
+              state.songlist.currentSongIndex = newIndex
+              state.songlist.currentSong = data.queue![newIndex]
+            },
+          )
         }
       } else if (songlist.currentSong?.id !== data.songId) {
         // Same queue but different song (e.g. host skipped to next/prev track)
         console.log('[Jam] Syncing song change within existing queue')
-        const newIndex = songlist.currentList.findIndex((s: ISong) => s.id === data.songId)
+        const newIndex = songlist.currentList.findIndex(
+          (s: ISong) => s.id === data.songId,
+        )
         if (newIndex !== -1) {
-          usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
-            state.songlist.currentSongIndex = newIndex
-            state.songlist.currentSong = state.songlist.currentList[newIndex]
-          })
+          usePlayerStore.setState(
+            (state: ReturnType<typeof usePlayerStore.getState>) => {
+              state.songlist.currentSongIndex = newIndex
+              state.songlist.currentSong = state.songlist.currentList[newIndex]
+            },
+          )
         } else if (data.queue) {
           // Song not found in current list at all — use the provided queue
-          const queueIndex = data.queue.findIndex((s: ISong) => s.id === data.songId)
+          const queueIndex = data.queue.findIndex(
+            (s: ISong) => s.id === data.songId,
+          )
           if (queueIndex !== -1) {
-            usePlayerStore.setState((state: ReturnType<typeof usePlayerStore.getState>) => {
-              state.songlist.currentList = data.queue!
-              state.songlist.currentSongIndex = queueIndex
-              state.songlist.currentSong = data.queue![queueIndex]
-            })
+            usePlayerStore.setState(
+              (state: ReturnType<typeof usePlayerStore.getState>) => {
+                state.songlist.currentList = data.queue!
+                state.songlist.currentSongIndex = queueIndex
+                state.songlist.currentSong = data.queue![queueIndex]
+              },
+            )
           }
         }
       }
@@ -210,10 +242,10 @@ class JamService {
       const { syncThreshold } = useJamStore.getState()
       const audio = playerState.audioPlayerRef
       if (audio) {
-          const drift = Math.abs(audio.currentTime - data.progress)
-          if (drift > syncThreshold) {
-              audio.currentTime = data.progress
-          }
+        const drift = Math.abs(audio.currentTime - data.progress)
+        if (drift > syncThreshold) {
+          audio.currentTime = data.progress
+        }
       }
     } finally {
       // Always clear the flag, even if an error occurs
