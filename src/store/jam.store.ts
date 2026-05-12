@@ -28,6 +28,10 @@ export interface IJamSession {
   lastLeadState: IJamLeadState | null
   syncThreshold: number
   pendingJamSessionId: string | null
+  /** URL of the Aonsoku web-app that proxies the jam-sync WebSocket server.
+   *  Only needed in Electron / non-HTTP contexts where window.location.origin
+   *  cannot be used. Example: "https://mus.bsums.xyz" */
+  syncServerUrl: string
 }
 
 interface IJamActions {
@@ -43,6 +47,7 @@ interface IJamActions {
   setLastLeadState: (state: IJamLeadState) => void
   setSyncThreshold: (value: number) => void
   setPendingJamSessionId: (id: string | null) => void
+  setSyncServerUrl: (url: string) => void
 }
 
 export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
@@ -60,6 +65,7 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
           lastLeadState: null,
           syncThreshold: 2,
           pendingJamSessionId: null,
+          syncServerUrl: '',
           actions: {
             setSession: (sessionId, isLead) => {
               set((state) => {
@@ -133,11 +139,22 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
                 state.pendingJamSessionId = id
               })
             },
+            setSyncServerUrl: (url) => {
+              set((state) => {
+                state.syncServerUrl = url
+              })
+            },
           },
         }),
         {
           name: 'jam-storage',
-          partialize: (state) => ({ id: state.id, isLead: state.isLead, syncThreshold: state.syncThreshold, pendingJamSessionId: state.pendingJamSessionId }),
+          partialize: (state) => ({
+            id: state.id,
+            isLead: state.isLead,
+            syncThreshold: state.syncThreshold,
+            pendingJamSessionId: state.pendingJamSessionId,
+            syncServerUrl: state.syncServerUrl,
+          }),
         },
       ),
     ),
@@ -145,7 +162,8 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
 )
 
 export const useJamActions = () => useJamStore((state) => state.actions)
-export const useJamState = () => useJamStore((state) => ({
+export const useJamState = () =>
+  useJamStore((state) => ({
     id: state.id,
     participants: state.participants,
     isConnected: state.isConnected,
@@ -154,4 +172,4 @@ export const useJamState = () => useJamStore((state) => ({
     error: state.error,
     canGuestsControl: state.canGuestsControl,
     syncThreshold: state.syncThreshold,
-}))
+  }))

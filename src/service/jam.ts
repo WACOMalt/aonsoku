@@ -3,6 +3,7 @@ import { useAppStore } from '@/store/app.store'
 import { useJamStore } from '@/store/jam.store'
 import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
+import { getSyncServerUrl } from '@/utils/syncServerUrl'
 
 class JamService {
   private socket: Socket | null = null
@@ -13,14 +14,6 @@ class JamService {
 
   get isSyncing() {
     return this._isSyncing
-  }
-
-  private get syncServerUrl() {
-    const origin = window.location.origin
-    if (origin.startsWith('http://') || origin.startsWith('https://')) {
-      return origin
-    }
-    return useAppStore.getState().data.url
   }
 
   private init() {
@@ -63,9 +56,22 @@ class JamService {
 
     if (!sessionId || this.socket?.connected) return
 
+    const syncUrl = getSyncServerUrl()
+    if (!syncUrl) {
+      setError(
+        'No sync server URL configured. In Electron, set it via Settings → Content → Jam / Connect.',
+      )
+      console.error(
+        '[Jam] No sync server URL available. In Electron, configure it via Settings → Content → Jam / Connect.',
+      )
+      return
+    }
+
     setConnecting(true)
 
-    this.socket = io(this.syncServerUrl, {
+    console.log('[Jam] Connecting to sync server at:', syncUrl)
+
+    this.socket = io(syncUrl, {
       path: '/jam-sync/socket.io', // Proxy-compatible path
       query: { sessionId, username, isLead: String(isLead) },
     })
