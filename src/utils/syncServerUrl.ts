@@ -12,18 +12,27 @@ import { useJamStore } from '@/store/jam.store'
  * jam-sync endpoint.
  */
 export function getSyncServerUrl(): string | null {
-  // 1. If the page was loaded over HTTP(S), the sync server shares the origin.
+  // If the page was loaded over HTTP(S) from a real host (not localhost),
+  // the sync server shares the origin (nginx reverse-proxies /jam-sync/).
+  // Capacitor Android uses https://localhost, dev servers use http://localhost:PORT,
+  // and neither hosts the sync server.
   const origin = window.location.origin
-  if (origin.startsWith('http://') || origin.startsWith('https://')) {
+  const hostname = window.location.hostname
+  if (
+    (origin.startsWith('http://') || origin.startsWith('https://')) &&
+    hostname !== 'localhost' &&
+    hostname !== '127.0.0.1'
+  ) {
     return origin
   }
 
-  // 2. Fall back to the user-configured sync server URL (Electron / file://).
+  // Fall back to the user-configured sync server URL
+  // (Electron / Capacitor / file:// / dev).
   const configured = useJamStore.getState().syncServerUrl
   if (configured) {
     return configured
   }
 
-  // 3. No usable URL — caller should surface an error to the user.
+  // No usable URL — caller should surface an error to the user.
   return null
 }
