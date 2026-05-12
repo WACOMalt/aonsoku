@@ -1,8 +1,8 @@
 import { Users } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'react-toastify'
 import { Button } from '@/app/components/ui/button'
-import { SimpleTooltip } from '@/app/components/ui/simple-tooltip'
 import {
   Dialog,
   DialogContent,
@@ -11,16 +11,26 @@ import {
   DialogTrigger,
 } from '@/app/components/ui/dialog'
 import { Input } from '@/app/components/ui/input'
-import { Switch } from '@/app/components/ui/switch'
+import { SimpleTooltip } from '@/app/components/ui/simple-tooltip'
 import { Slider } from '@/app/components/ui/slider'
-import { useJamState, useJamActions } from '@/store/jam.store'
-import { jamService } from '@/service/jam'
+import { Switch } from '@/app/components/ui/switch'
 import { ROUTES } from '@/routes/routesList'
-import { toast } from 'react-toastify'
+import { jamService } from '@/service/jam'
+import { useJamActions, useJamState } from '@/store/jam.store'
+import { getSyncServerUrl } from '@/utils/syncServerUrl'
 
 export function JamButton() {
   const { t } = useTranslation()
-  const { id, isConnected, participants, isLead, canGuestsControl, isConnecting, error, syncThreshold } = useJamState()
+  const {
+    id,
+    isConnected,
+    participants,
+    isLead,
+    canGuestsControl,
+    isConnecting,
+    error,
+    syncThreshold,
+  } = useJamState()
   const { reset, setSyncThreshold } = useJamActions()
   const [joinId, setJoinId] = useState('')
 
@@ -56,8 +66,10 @@ export function JamButton() {
   }
 
   const copyLink = () => {
-    // Use hash router format so the link works directly in the browser
-    const link = `${window.location.origin}/#${ROUTES.JAM.JOIN(id!)}`
+    // Use sync server URL so the link works in Electron/Capacitor
+    // where window.location.origin is file:// or https://localhost
+    const baseUrl = getSyncServerUrl() ?? window.location.origin
+    const link = `${baseUrl}/#${ROUTES.JAM.JOIN(id!)}`
     navigator.clipboard.writeText(link)
     toast.success('Invite link copied!')
   }
@@ -93,26 +105,42 @@ export function JamButton() {
                   value={joinId}
                   onChange={(e) => setJoinId(e.target.value)}
                 />
-                <Button variant="secondary" onClick={handleJoin}>Join</Button>
+                <Button variant="secondary" onClick={handleJoin}>
+                  Join
+                </Button>
               </div>
             </>
           ) : (
             <div className="flex flex-col gap-3">
               <div className="flex justify-between items-center">
                 <span className="font-bold">Session: {id}</span>
-                <Button size="sm" variant="outline" onClick={copyLink}>Copy Invite Link</Button>
+                <Button size="sm" variant="outline" onClick={copyLink}>
+                  Copy Invite Link
+                </Button>
               </div>
 
-              {isConnecting && <p className="text-sm text-muted-foreground">Connecting...</p>}
-              {error && <p className="text-sm text-destructive">Error: {error}</p>}
+              {isConnecting && (
+                <p className="text-sm text-muted-foreground">Connecting...</p>
+              )}
+              {error && (
+                <p className="text-sm text-destructive">Error: {error}</p>
+              )}
 
               <div className="bg-secondary/20 p-3 rounded-md">
-                <h4 className="text-sm font-semibold mb-2">Participants ({participants.length})</h4>
+                <h4 className="text-sm font-semibold mb-2">
+                  Participants ({participants.length})
+                </h4>
                 <ul className="text-sm space-y-1">
-                  {participants.map(p => (
+                  {participants.map((p) => (
                     <li key={p.id} className="flex justify-between">
-                      <span>{p.name} {p.isLead === true ? '(Host)' : ''}</span>
-                      {p.isLead && <span className="text-[10px] bg-primary/20 px-1 rounded">Lead</span>}
+                      <span>
+                        {p.name} {p.isLead === true ? '(Host)' : ''}
+                      </span>
+                      {p.isLead && (
+                        <span className="text-[10px] bg-primary/20 px-1 rounded">
+                          Lead
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -120,10 +148,14 @@ export function JamButton() {
 
               {isLead && (
                 <div className="flex items-center justify-between mt-2">
-                  <span className="text-sm">Allow guests to control playback</span>
+                  <span className="text-sm">
+                    Allow guests to control playback
+                  </span>
                   <Switch
                     checked={canGuestsControl}
-                    onCheckedChange={(checked) => jamService.setGuestControl(checked)}
+                    onCheckedChange={(checked) =>
+                      jamService.setGuestControl(checked)
+                    }
                   />
                 </div>
               )}
@@ -131,7 +163,9 @@ export function JamButton() {
               <div className="flex flex-col gap-2 mt-1">
                 <div className="flex justify-between items-center">
                   <span className="text-sm">Sync threshold</span>
-                  <span className="text-sm font-mono text-muted-foreground">{syncThreshold}s</span>
+                  <span className="text-sm font-mono text-muted-foreground">
+                    {syncThreshold}s
+                  </span>
                 </div>
                 <Slider
                   min={0.5}
