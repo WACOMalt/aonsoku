@@ -1,13 +1,13 @@
-import { Monitor, Volume2 } from 'lucide-react'
+import { Monitor, Smartphone, Volume2 } from 'lucide-react'
 import { Button } from '@/app/components/ui/button'
-import { SimpleTooltip } from '@/app/components/ui/simple-tooltip'
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/app/components/ui/popover'
-import { useConnectState } from '@/store/connect.store'
+import { SimpleTooltip } from '@/app/components/ui/simple-tooltip'
 import { connectService } from '@/service/connect'
+import { useConnectState } from '@/store/connect.store'
 
 export function DevicePicker() {
   const { devices, thisDeviceId, isConnected } = useConnectState()
@@ -25,9 +25,7 @@ export function DevicePicker() {
           <Button
             variant="ghost"
             className={`relative rounded-full size-10 p-0 ${
-              devices.length > 1
-                ? 'text-primary'
-                : 'text-secondary-foreground'
+              devices.length > 1 ? 'text-primary' : 'text-secondary-foreground'
             }`}
           >
             <Monitor className="size-[18px]" />
@@ -66,6 +64,10 @@ export function DevicePicker() {
                     <div className="flex items-center gap-2 min-w-0">
                       {isActive ? (
                         <Volume2 className="size-4 text-primary shrink-0" />
+                      ) : device.name.includes('Android') ||
+                        device.name.includes('iOS') ||
+                        device.name.includes('Mobile') ? (
+                        <Smartphone className="size-4 text-muted-foreground shrink-0" />
                       ) : (
                         <Monitor className="size-4 text-muted-foreground shrink-0" />
                       )}

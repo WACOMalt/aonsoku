@@ -17,6 +17,11 @@ export function getDeviceId(): string {
 export function getDeviceName(): string {
   const ua = navigator.userAgent
   // Simple device name detection
+  if (
+    typeof (window as unknown as Record<string, unknown>).Capacitor !==
+    'undefined'
+  )
+    return 'Android App'
   if (ua.includes('Electron')) return 'Desktop App'
   if (ua.includes('Chrome')) return `Chrome on ${getOS()}`
   if (ua.includes('Firefox')) return `Firefox on ${getOS()}`
