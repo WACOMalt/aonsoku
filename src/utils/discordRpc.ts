@@ -1,3 +1,4 @@
+import { getSimpleCoverArtUrl } from '@/api/httpClient'
 import { useAppStore } from '@/store/app.store'
 import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
@@ -19,6 +20,11 @@ function send(song: ISong, currentTime = 0, duration = 0) {
   const startTime = Math.floor(Date.now() - currentTimeInMs)
   const endTime = Math.floor(Date.now() - currentTimeInMs + durationInMs)
 
+  // Build cover art URL with embedded auth params so Discord can fetch it
+  const coverArtUrl = song.coverArt
+    ? getSimpleCoverArtUrl(song.coverArt, 'album', '512')
+    : undefined
+
   window.api.setDiscordRpcActivity({
     trackName: song.title,
     albumName: song.album,
@@ -26,6 +32,7 @@ function send(song: ISong, currentTime = 0, duration = 0) {
     startTime,
     endTime,
     duration,
+    coverArtUrl,
   })
 }
 
