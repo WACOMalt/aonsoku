@@ -1,4 +1,5 @@
 import {
+  ChevronRight,
   CircleUserRound,
   EarthLock,
   FileText,
@@ -16,6 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/app/components/ui/sidebar'
+import { useIsMobile } from '@/app/hooks/use-mobile'
 import { useAppSettings } from '@/store/app.store'
 import { isDesktop } from '@/utils/desktop'
 
@@ -45,9 +47,19 @@ const options: OptionsData[] = [
   { id: 'privacy', icon: EarthLock },
 ]
 
-export function SettingsOptions() {
+interface SettingsOptionsProps {
+  onCategorySelect?: () => void
+}
+
+export function SettingsOptions({ onCategorySelect }: SettingsOptionsProps) {
   const { t } = useTranslation()
   const { currentPage, setCurrentPage } = useAppSettings()
+  const isMobile = useIsMobile()
+
+  const handleClick = (id: SettingsOptions) => {
+    setCurrentPage(id)
+    onCategorySelect?.()
+  }
 
   return (
     <SidebarGroup>
@@ -57,10 +69,15 @@ export function SettingsOptions() {
             <SidebarMenuItem key={item.id}>
               <SidebarMenuButton
                 isActive={item.id === currentPage}
-                onClick={() => setCurrentPage(item.id)}
+                onClick={() => handleClick(item.id)}
               >
                 <item.icon />
-                <span>{t(`settings.options.${item.id}`)}</span>
+                <span className="flex-1">
+                  {t(`settings.options.${item.id}`)}
+                </span>
+                {isMobile && (
+                  <ChevronRight className="ml-auto size-4 text-muted-foreground" />
+                )}
               </SidebarMenuButton>
             </SidebarMenuItem>
           ))}

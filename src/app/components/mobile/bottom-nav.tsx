@@ -1,19 +1,17 @@
-import { Home, Library, Search, Settings } from 'lucide-react'
+import { Home, Library, Search } from 'lucide-react'
 import { useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useMainSidebar } from '@/app/components/ui/main-sidebar'
 import { ROUTES } from '@/routes/routesList'
-import { useAppSettings, useAppStore } from '@/store/app.store'
+import { useAppStore } from '@/store/app.store'
 
 export function MobileBottomNav() {
   const navigate = useNavigate()
   const location = useLocation()
   const { setOpenMobile } = useMainSidebar()
-  const { setOpenDialog } = useAppSettings()
   const setCommandOpen = useAppStore((state) => state.command.setOpen)
 
   const isHome = location.pathname === '/' || location.pathname === ''
-  const isSearch = false // Command palette is a modal, not a route
   const isLibrary = location.pathname.startsWith('/library')
 
   const handleHome = useCallback(() => {
@@ -28,10 +26,6 @@ export function MobileBottomNav() {
     setOpenMobile(true)
   }, [setOpenMobile])
 
-  const handleSettings = useCallback(() => {
-    setOpenDialog(true)
-  }, [setOpenDialog])
-
   return (
     <nav className="md:hidden fixed left-0 right-0 z-40 bg-background border-t border-border bottom-[--player-height]">
       <div className="flex items-center justify-around h-12">
@@ -44,7 +38,7 @@ export function MobileBottomNav() {
         <NavItem
           icon={Search}
           label="Search"
-          active={isSearch}
+          active={false}
           onClick={handleSearch}
         />
         <NavItem
@@ -52,12 +46,6 @@ export function MobileBottomNav() {
           label="Library"
           active={isLibrary}
           onClick={handleLibrary}
-        />
-        <NavItem
-          icon={Settings}
-          label="Settings"
-          active={false}
-          onClick={handleSettings}
         />
       </div>
     </nav>
