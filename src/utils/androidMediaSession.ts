@@ -34,6 +34,8 @@ function isCapacitor(): boolean {
 }
 
 interface MediaSessionPluginInterface {
+  requestNotificationPermission(): Promise<void>
+
   updateMetadata(options: {
     title: string
     artist: string
@@ -69,6 +71,20 @@ if (isCapacitor()) {
 }
 
 let listenerRemover: { remove: () => void } | null = null
+
+/**
+ * Proactively requests the POST_NOTIFICATIONS permission on Android 13+.
+ * Should be called at app startup so the user sees the permission dialog
+ * immediately (like Spotify), rather than waiting until the first song plays.
+ */
+export async function requestAndroidNotificationPermission(): Promise<void> {
+  if (!MediaSession) return
+  try {
+    await MediaSession.requestNotificationPermission()
+  } catch (error) {
+    console.error('[AndroidMediaSession] requestPermission error:', error)
+  }
+}
 
 /**
  * Updates the Android media notification with song metadata.

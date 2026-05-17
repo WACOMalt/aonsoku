@@ -8,6 +8,7 @@ import {
 import {
   destroyAndroidMediaSession,
   isAndroidCapacitor,
+  requestAndroidNotificationPermission,
   setupAndroidMediaSessionListeners,
   updateAndroidMediaSession,
   updateAndroidPlaybackState,
@@ -37,6 +38,13 @@ export function MediaSessionObserver() {
 
   const resetAppTitle = useCallback(() => {
     document.title = appName
+  }, [])
+
+  // Proactively request notification permission on Android 13+ at startup
+  useEffect(() => {
+    if (isAndroidCapacitor()) {
+      requestAndroidNotificationPermission()
+    }
   }, [])
 
   // Set up Android native media session listeners once

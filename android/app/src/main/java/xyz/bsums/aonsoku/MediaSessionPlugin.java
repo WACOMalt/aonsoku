@@ -96,6 +96,23 @@ public class MediaSessionPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void requestNotificationPermission(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            if (ContextCompat.checkSelfPermission(getContext(), "android.permission.POST_NOTIFICATIONS")
+                    != PackageManager.PERMISSION_GRANTED) {
+                requestPermissionForAlias("notifications", call, "requestPermissionCallback");
+                return;
+            }
+        }
+        call.resolve();
+    }
+
+    @PermissionCallback
+    private void requestPermissionCallback(PluginCall call) {
+        call.resolve();
+    }
+
+    @PluginMethod
     public void updateMetadata(PluginCall call) {
         // Check notification permission on Android 13+
         if (Build.VERSION.SDK_INT >= 33) {
