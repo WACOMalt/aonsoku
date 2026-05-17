@@ -82,6 +82,13 @@ export function PlayerControls({
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: isPlaying needed to trigger
   useEffect(() => {
+    // On Android Capacitor, media button handlers are set up natively
+    // via MediaSessionPlugin, so skip the web MediaSession API handlers.
+    const isCapacitor =
+      typeof window !== 'undefined' &&
+      !!(window as { Capacitor?: unknown }).Capacitor
+    if (isCapacitor) return
+
     if (isPodcast) {
       manageMediaSession.setPodcastHandlers({ handleSeekAction })
     } else {

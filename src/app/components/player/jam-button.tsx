@@ -1,6 +1,5 @@
 import { Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import { toast } from 'react-toastify'
 import { Button } from '@/app/components/ui/button'
 import {
@@ -20,7 +19,6 @@ import { useJamActions, useJamState } from '@/store/jam.store'
 import { getSyncServerUrl } from '@/utils/syncServerUrl'
 
 export function JamButton() {
-  const { t } = useTranslation()
   const {
     id,
     isConnected,
@@ -31,7 +29,7 @@ export function JamButton() {
     error,
     syncThreshold,
   } = useJamState()
-  const { reset, setSyncThreshold } = useJamActions()
+  const { setSyncThreshold } = useJamActions()
   const [joinId, setJoinId] = useState('')
 
   // Listen for host-ended session event from jamService
@@ -44,7 +42,7 @@ export function JamButton() {
   }, [])
 
   const handleCreate = () => {
-    const newId = jamService.createSession()
+    jamService.createSession()
     toast.success('Jam session created!')
   }
 
