@@ -18,6 +18,7 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 @CapacitorPlugin(
     name = "MediaSession",
@@ -109,8 +110,8 @@ public class MediaSessionPlugin extends Plugin {
         processUpdateMetadata(call);
     }
 
-    @PluginMethod
-    public void notificationPermissionCallback(PluginCall call) {
+    @PermissionCallback
+    private void notificationPermissionCallback(PluginCall call) {
         // Permission result received, proceed with metadata update regardless
         // (notification may not show but service still works for bluetooth)
         processUpdateMetadata(call);
