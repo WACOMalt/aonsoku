@@ -7,20 +7,29 @@
  *
  * The Web MediaSession API (navigator.mediaSession) does NOT work in
  * Android WebView, so this native bridge is required for Android builds.
+ *
+ * IMPORTANT: The plugin is registered synchronously at module load time
+ * to avoid race conditions from multiple async registrations and to
+ * prevent the Capacitor proxy's .then() trap from being triggered by await.
  */
 
+import { registerPlugin } from '@capacitor/core'
 import { getSimpleCoverArtUrl } from '@/api/httpClient'
-import { usePlayerStore } from '@/store/player.store'
-import { EpisodeWithPodcast } from '@/types/responses/podcasts'
-import { ISong } from '@/types/responses/song'
+import type { EpisodeWithPodcast } from '@/types/responses/podcasts'
+import type { ISong } from '@/types/responses/song'
 
 /**
- * Checks if the current environment is a Capacitor native app.
+ * Checks if the current environment is a Capacitor native app on Android.
  */
 function isCapacitor(): boolean {
   return (
     typeof window !== 'undefined' &&
-    !!(window as { Capacitor?: unknown }).Capacitor
+    !!(
+      window as { Capacitor?: { getPlatform?: () => string } }
+    ).Capacitor?.getPlatform?.() &&
+    (
+      window as { Capacitor?: { getPlatform?: () => string } }
+    ).Capacitor?.getPlatform?.() === 'android'
   )
 }
 
@@ -47,40 +56,32 @@ interface MediaSessionPluginInterface {
   ): Promise<{ remove: () => void }>
 }
 
-let pluginInstance: MediaSessionPluginInterface | null = null
-let listenerRemover: { remove: () => void } | null = null
-
-/**
- * Lazily initializes and returns the MediaSession Capacitor plugin.
- */
-async function getPlugin(): Promise<MediaSessionPluginInterface | null> {
-  if (!isCapacitor()) return null
-
-  if (pluginInstance) return pluginInstance
-
+// Register plugin ONCE at module load time (synchronous, no await).
+// This avoids the race condition from multiple async getPlugin() calls
+// and prevents the .then() proxy trap issue when awaiting the plugin.
+let MediaSession: MediaSessionPluginInterface | null = null
+if (isCapacitor()) {
   try {
-    const { registerPlugin } = await import('@capacitor/core')
-    pluginInstance = registerPlugin<MediaSessionPluginInterface>('MediaSession')
-    return pluginInstance
-  } catch (error) {
-    console.error('[AndroidMediaSession] Failed to load plugin:', error)
-    return null
+    MediaSession = registerPlugin<MediaSessionPluginInterface>('MediaSession')
+  } catch (e) {
+    console.error('[AndroidMediaSession] Failed to register plugin:', e)
   }
 }
+
+let listenerRemover: { remove: () => void } | null = null
 
 /**
  * Updates the Android media notification with song metadata.
  */
-export async function updateAndroidMediaSession(song: ISong) {
-  const plugin = await getPlugin()
-  if (!plugin) return
+export async function updateAndroidMediaSession(song: ISong): Promise<void> {
+  if (!MediaSession) return
 
   const artworkUrl = song.coverArt
     ? getSimpleCoverArtUrl(song.coverArt, 'song', '512')
     : ''
 
   try {
-    await plugin.updateMetadata({
+    await MediaSession.updateMetadata({
       title: song.title,
       artist: song.artist,
       album: song.album,
@@ -97,17 +98,16 @@ export async function updateAndroidMediaSession(song: ISong) {
  */
 export async function updateAndroidPodcastMediaSession(
   episode: EpisodeWithPodcast,
-) {
-  const plugin = await getPlugin()
-  if (!plugin) return
+): Promise<void> {
+  if (!MediaSession) return
 
   try {
-    await plugin.updateMetadata({
+    await MediaSession.updateMetadata({
       title: episode.title,
       artist: episode.podcast.author || '',
       album: episode.podcast.title,
       artworkUrl: episode.image_url || '',
-      duration: 0, // Podcast duration may not be available
+      duration: 0,
     })
   } catch (error) {
     console.error(
@@ -123,12 +123,11 @@ export async function updateAndroidPodcastMediaSession(
 export async function updateAndroidRadioMediaSession(
   label: string,
   radioName: string,
-) {
-  const plugin = await getPlugin()
-  if (!plugin) return
+): Promise<void> {
+  if (!MediaSession) return
 
   try {
-    await plugin.updateMetadata({
+    await MediaSession.updateMetadata({
       title: radioName,
       artist: label,
       album: '',
@@ -146,12 +145,13 @@ export async function updateAndroidRadioMediaSession(
 /**
  * Updates the playback state (playing/paused) on the Android notification.
  */
-export async function updateAndroidPlaybackState(isPlaying: boolean) {
-  const plugin = await getPlugin()
-  if (!plugin) return
+export async function updateAndroidPlaybackState(
+  isPlaying: boolean,
+): Promise<void> {
+  if (!MediaSession) return
 
   try {
-    await plugin.updatePlaybackState({
+    await MediaSession.updatePlaybackState({
       isPlaying,
       position: 0,
       playbackRate: 1.0,
@@ -167,12 +167,11 @@ export async function updateAndroidPlaybackState(isPlaying: boolean) {
 /**
  * Destroys the Android media session and stops the foreground service.
  */
-export async function destroyAndroidMediaSession() {
-  const plugin = await getPlugin()
-  if (!plugin) return
+export async function destroyAndroidMediaSession(): Promise<void> {
+  if (!MediaSession) return
 
   try {
-    await plugin.destroy()
+    await MediaSession.destroy()
   } catch (error) {
     console.error(
       '[AndroidMediaSession] Failed to destroy media session:',
@@ -188,9 +187,8 @@ export async function destroyAndroidMediaSession() {
  *
  * Should be called once on app initialization.
  */
-export async function setupAndroidMediaSessionListeners() {
-  const plugin = await getPlugin()
-  if (!plugin) return
+export async function setupAndroidMediaSessionListeners(): Promise<void> {
+  if (!MediaSession) return
 
   // Remove any existing listener
   if (listenerRemover) {
@@ -199,32 +197,38 @@ export async function setupAndroidMediaSessionListeners() {
   }
 
   try {
-    listenerRemover = await plugin.addListener('mediaSessionAction', (data) => {
-      const state = usePlayerStore.getState()
-      const { togglePlayPause, playNextSong, playPrevSong } = state.actions
+    // Import player store lazily to avoid circular dependencies
+    const { usePlayerStore } = await import('@/store/player.store')
 
-      console.log('[AndroidMediaSession] Action received:', data.action)
+    listenerRemover = await MediaSession.addListener(
+      'mediaSessionAction',
+      (data) => {
+        const state = usePlayerStore.getState()
+        const { togglePlayPause, playNextSong, playPrevSong } = state.actions
 
-      switch (data.action) {
-        case 'play':
-        case 'pause':
-          togglePlayPause()
-          break
-        case 'nexttrack':
-          playNextSong()
-          break
-        case 'previoustrack':
-          playPrevSong()
-          break
-        case 'stop':
-          // Pause and destroy the session
-          state.actions.setPlayingState(false)
-          destroyAndroidMediaSession()
-          break
-        default:
-          console.log('[AndroidMediaSession] Unhandled action:', data.action)
-      }
-    })
+        console.log('[AndroidMediaSession] Action received:', data.action)
+
+        switch (data.action) {
+          case 'play':
+          case 'pause':
+            togglePlayPause()
+            break
+          case 'nexttrack':
+            playNextSong()
+            break
+          case 'previoustrack':
+            playPrevSong()
+            break
+          case 'stop':
+            // Pause and destroy the session
+            state.actions.setPlayingState(false)
+            destroyAndroidMediaSession()
+            break
+          default:
+            console.log('[AndroidMediaSession] Unhandled action:', data.action)
+        }
+      },
+    )
   } catch (error) {
     console.error('[AndroidMediaSession] Failed to setup listeners:', error)
   }
