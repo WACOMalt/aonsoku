@@ -48,29 +48,65 @@ export function updateMetaThemeColor() {
 }
 
 /**
+ * Checks if the current environment is a Capacitor native app.
+ */
+function isCapacitor(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    !!(window as { Capacitor?: unknown }).Capacitor
+  )
+}
+
+/**
+ * Reads the current theme's --background CSS variable and returns
+ * the hex color and whether it's a dark color.
+ * Uses requestAnimationFrame to ensure CSS has been applied to the DOM.
+ */
+function getThemeBackgroundColor(): Promise<{
+  hexColor: string
+  dark: boolean
+} | null> {
+  return new Promise((resolve) => {
+    // Use requestAnimationFrame to ensure the theme class has been applied
+    // and the browser has recalculated styles
+    requestAnimationFrame(() => {
+      const root = window.document.documentElement
+      const styles = getComputedStyle(root)
+      const bgHsl = styles.getPropertyValue('--background').trim()
+
+      if (!bgHsl) {
+        console.warn('[SystemBars] No --background CSS variable found')
+        resolve(null)
+        return
+      }
+
+      try {
+        const hexColor = hslToHex(bgHsl)
+        const dark = isDarkColor(bgHsl)
+        resolve({ hexColor, dark })
+      } catch (error) {
+        console.error(
+          '[SystemBars] Failed to parse --background:',
+          bgHsl,
+          error,
+        )
+        resolve(null)
+      }
+    })
+  })
+}
+
+/**
  * Updates the Android status bar color and style via the Capacitor StatusBar plugin.
- * Uses dynamic import() to avoid bundling issues on non-Capacitor platforms.
+ * Uses requestAnimationFrame to ensure CSS has been applied before reading computed styles.
  */
 export async function updateCapacitorStatusBar() {
-  // Only run on Capacitor (Android/iOS)
-  if (
-    typeof window === 'undefined' ||
-    !(window as { Capacitor?: unknown }).Capacitor
-  ) {
-    return
-  }
+  if (!isCapacitor()) return
 
-  const root = window.document.documentElement
-  const styles = getComputedStyle(root)
-  const bgHsl = styles.getPropertyValue('--background').trim()
+  const bg = await getThemeBackgroundColor()
+  if (!bg) return
 
-  if (!bgHsl) {
-    console.warn('[StatusBar] No --background CSS variable found')
-    return
-  }
-
-  const hexColor = hslToHex(bgHsl)
-  const dark = isDarkColor(bgHsl)
+  const { hexColor, dark } = bg
 
   console.log(
     `[StatusBar] Setting color=${hexColor}, style=${dark ? 'Dark' : 'Light'}`,
@@ -91,6 +127,56 @@ export async function updateCapacitorStatusBar() {
   } catch (error) {
     console.error('[StatusBar] Failed to update status bar:', error)
   }
+}
+
+interface NavigationBarPlugin {
+  setBackgroundColor(options: {
+    color: string
+    isLight: boolean
+  }): Promise<{ color: string }>
+}
+
+/**
+ * Updates the Android navigation bar color via the custom NavigationBar Capacitor plugin.
+ * Uses requestAnimationFrame to ensure CSS has been applied before reading computed styles.
+ */
+export async function updateCapacitorNavigationBar() {
+  if (!isCapacitor()) return
+
+  const bg = await getThemeBackgroundColor()
+  if (!bg) return
+
+  const { hexColor, dark } = bg
+
+  console.log(`[NavigationBar] Setting color=${hexColor}, isLight=${!dark}`)
+
+  try {
+    const { registerPlugin } = await import('@capacitor/core')
+    const NavigationBar =
+      registerPlugin<NavigationBarPlugin>('NavigationBar')
+
+    await NavigationBar.setBackgroundColor({
+      color: hexColor,
+      isLight: !dark,
+    })
+
+    console.log('[NavigationBar] Successfully updated navigation bar')
+  } catch (error) {
+    console.error('[NavigationBar] Failed to update navigation bar:', error)
+  }
+}
+
+/**
+ * Updates both the status bar and navigation bar colors on Android.
+ * Combines both operations for convenience.
+ */
+export async function updateCapacitorSystemBars() {
+  if (!isCapacitor()) return
+
+  await Promise.all([
+    updateCapacitorStatusBar(),
+    updateCapacitorNavigationBar(),
+  ])
 }
 
 export function getValidThemeFromEnv(): Theme | null {
