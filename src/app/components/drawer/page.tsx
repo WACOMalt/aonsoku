@@ -33,14 +33,14 @@ export function MainDrawerPage() {
     <Drawer
       open={mainDrawerState}
       onClose={closeDrawer}
-      fixed={true}
+      fixed={false}
       handleOnly={true}
       disablePreventScroll={true}
       dismissible={true}
       modal={false}
     >
       <DrawerContent
-        className="main-drawer rounded-t-none border-none select-none cursor-default outline-none"
+        className="main-drawer w-80 rounded-t-none border-none select-none cursor-default outline-none"
         showHandle={false}
         aria-describedby={undefined}
       >

@@ -120,7 +120,7 @@ export async function updateCapacitorStatusBar() {
 
     // Set status bar icon style: Light icons on dark backgrounds, Dark icons on light
     await StatusBar.setStyle({
-      style: dark ? Style.Dark : Style.Light,
+      style: dark ? Style.Light : Style.Dark,
     })
 
     console.log('[StatusBar] Successfully updated status bar')
