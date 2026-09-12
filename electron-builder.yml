@@ -66,5 +66,5 @@ nativeRebuilder: legacy
 
 publish:
   provider: github
-  owner: victoralvesf
+  owner: WACOMalt
   repo: aonsoku
