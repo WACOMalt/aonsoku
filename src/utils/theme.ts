@@ -118,7 +118,7 @@ export async function updateCapacitorStatusBar() {
     // Set status bar background color
     await StatusBar.setBackgroundColor({ color: hexColor })
 
-    // Set status bar icon style: Light icons on dark backgrounds, Dark icons on light
+    // Set status bar icon style: Light (dark) icons on dark backgrounds, Dark (light) icons on light
     await StatusBar.setStyle({
       style: dark ? Style.Light : Style.Dark,
     })
