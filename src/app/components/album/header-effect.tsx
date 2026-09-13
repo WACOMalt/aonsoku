@@ -11,7 +11,7 @@ export const ImageHeaderEffect = forwardRef<
       className={cn(
         'bg-gradient-to-b from-background/60 to-background-foreground',
         'w-full h-64 z-0',
-        'absolute top-[calc(3rem+200px)] 2xl:top-[calc(3rem+250px)]',
+        'absolute top-full',
         className,
       )}
       {...props}

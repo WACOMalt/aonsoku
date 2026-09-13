@@ -69,7 +69,7 @@ export default function ImageHeader({
           )}
           <div
             className={cn(
-              'w-full px-4 md:px-8 py-6 flex flex-col items-center md:flex-row md:items-end gap-4 absolute inset-0',
+              'w-full px-4 md:px-8 py-6 flex flex-col items-center md:flex-row md:items-end gap-4 relative md:absolute md:inset-0',
               'bg-gradient-to-b from-background/20 to-background/50',
             )}
             style={{ backgroundColor: bgColor }}
