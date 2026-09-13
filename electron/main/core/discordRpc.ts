@@ -1,4 +1,9 @@
-import { DEFAULT_LARGE_IMAGE, DEFAULT_SMALL_IMAGE, RPC } from './discord'
+import {
+  DEFAULT_LARGE_IMAGE,
+  DEFAULT_SMALL_IMAGE,
+  RPC,
+  StatusDisplayType,
+} from './discord'
 
 export type RpcPayload = {
   trackName: string
@@ -14,8 +19,11 @@ export async function setDiscordRpcActivity(payload: RpcPayload) {
   try {
     RPC.init()
     RPC.set({
-      details: payload.trackName,
-      state: `${payload.artist} • ${payload.albumName}`,
+      // "Artist - Song" is both the card headline and, via
+      // status_display_type, the compact status shown under the username.
+      details: `${payload.artist} - ${payload.trackName}`,
+      state: payload.albumName,
+      status_display_type: StatusDisplayType.Details,
       timestamps: {
         start: payload.startTime,
         end: payload.endTime,

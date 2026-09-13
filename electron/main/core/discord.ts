@@ -1,6 +1,12 @@
 import { Client } from '@xhayper/discord-rpc'
 import { productName } from '../../../package.json'
 
+export const StatusDisplayType = {
+  Name: 0,
+  State: 1,
+  Details: 2,
+}
+
 const ActivityType = {
   Game: 0,
   Streaming: 1,
@@ -25,6 +31,11 @@ type IActivity = {
   }
   instance?: boolean
   type?: number
+  /**
+   * What Discord shows in the compact status line under the username:
+   * 0 = application name, 1 = state, 2 = details.
+   */
+  status_display_type?: number
 }
 
 export type PayloadType = {
