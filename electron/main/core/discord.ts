@@ -1,4 +1,4 @@
-import { Client } from 'discord-rpc'
+import { Client } from '@xhayper/discord-rpc'
 import { productName } from '../../../package.json'
 
 const ActivityType = {
@@ -57,11 +57,22 @@ let lastPayload: PayloadType | null = null
 function init() {
   if (discord) return
 
-  discord = new Client({ transport: 'ipc' })
+  const DISCORD_CLIENT_ID = import.meta.env.MAIN_VITE_DISCORD_CLIENT_ID
 
-  discord.on('ready', async () => {
-    // @ts-expect-error raw request
-    discord.request('SET_ACTIVITY', lastPayload ?? defaultPayload)
+  if (!DISCORD_CLIENT_ID) {
+    console.log('Discord Client ID not found.')
+    return
+  }
+
+  // @xhayper/discord-rpc probes the standard, Snap and Flatpak IPC socket
+  // locations on Linux, which the original discord-rpc package did not.
+  discord = new Client({
+    clientId: DISCORD_CLIENT_ID,
+    transport: { type: 'ipc' },
+  })
+
+  discord.on('ready', () => {
+    discord?.request('SET_ACTIVITY', lastPayload ?? defaultPayload)
   })
 
   discord.on('disconnected', () => {
@@ -73,14 +84,7 @@ function init() {
 function loginRPC() {
   if (!discord) return
 
-  const DISCORD_CLIENT_ID = import.meta.env.MAIN_VITE_DISCORD_CLIENT_ID
-
-  if (!DISCORD_CLIENT_ID) {
-    console.log('Discord Client ID not found.')
-    return
-  }
-
-  discord.login({ clientId: DISCORD_CLIENT_ID }).catch(() => {
+  discord.login().catch(() => {
     setTimeout(() => loginRPC(), 5000).unref()
   })
 }
@@ -98,7 +102,6 @@ function set(data: IActivity | null) {
   }
   lastPayload = payload
 
-  // @ts-expect-error raw request
   discord.request('SET_ACTIVITY', payload)
 }
 

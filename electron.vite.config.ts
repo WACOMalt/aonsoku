@@ -18,7 +18,7 @@ export default defineConfig({
           'electron-store',
           'electron-dl',
           'electron-updater',
-          'discord-rpc',
+          '@xhayper/discord-rpc',
         ],
       },
     },
