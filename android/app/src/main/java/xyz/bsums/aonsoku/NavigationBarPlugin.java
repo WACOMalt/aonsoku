@@ -59,17 +59,24 @@ public class NavigationBarPlugin extends Plugin {
                     window.setNavigationBarColor(parsedColor);
                     window.setStatusBarColor(parsedColor);
 
-                    // Set light/dark navigation bar icons (API 26+)
+                    // Set light/dark system bar icons. Setting the status bar
+                    // flag here too keeps the icons correct regardless of
+                    // whether the StatusBar plugin call lands before or after.
+                    View decorView = window.getDecorView();
+                    int flags = decorView.getSystemUiVisibility();
+                    if (Boolean.TRUE.equals(isLight)) {
+                        flags |= View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                    } else {
+                        flags &= ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                    }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        View decorView = window.getDecorView();
-                        int flags = decorView.getSystemUiVisibility();
                         if (Boolean.TRUE.equals(isLight)) {
                             flags |= View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
                         } else {
                             flags &= ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
                         }
-                        decorView.setSystemUiVisibility(flags);
                     }
+                    decorView.setSystemUiVisibility(flags);
                 }
             });
 

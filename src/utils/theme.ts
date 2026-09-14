@@ -1,6 +1,7 @@
 import { Theme } from '@/types/themeContext'
 import { isDesktop } from './desktop'
 import { hslToHex, hslToHsla, isDarkColor } from './getAverageColor'
+import { isCapacitor } from './platform'
 
 const DEFAULT_TITLE_BAR_COLOR = '#ff000000'
 const DEFAULT_TITLE_BAR_SYMBOL = '#ffffff'
@@ -45,16 +46,6 @@ export function updateMetaThemeColor() {
   if (meta) {
     meta.setAttribute('content', hexColor)
   }
-}
-
-/**
- * Checks if the current environment is a Capacitor native app.
- */
-function isCapacitor(): boolean {
-  return (
-    typeof window !== 'undefined' &&
-    !!(window as { Capacitor?: unknown }).Capacitor
-  )
 }
 
 /**
@@ -118,9 +109,10 @@ export async function updateCapacitorStatusBar() {
     // Set status bar background color
     await StatusBar.setBackgroundColor({ color: hexColor })
 
-    // Set status bar icon style: Light (dark) icons on dark backgrounds, Dark (light) icons on light
+    // Capacitor naming is about the bar, not the icons:
+    // Style.Dark  = dark bar with light icons, Style.Light = light bar with dark icons.
     await StatusBar.setStyle({
-      style: dark ? Style.Light : Style.Dark,
+      style: dark ? Style.Dark : Style.Light,
     })
 
     console.log('[StatusBar] Successfully updated status bar')
@@ -152,8 +144,7 @@ export async function updateCapacitorNavigationBar() {
 
   try {
     const { registerPlugin } = await import('@capacitor/core')
-    const NavigationBar =
-      registerPlugin<NavigationBarPlugin>('NavigationBar')
+    const NavigationBar = registerPlugin<NavigationBarPlugin>('NavigationBar')
 
     await NavigationBar.setBackgroundColor({
       color: hexColor,
