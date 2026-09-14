@@ -30,7 +30,6 @@ export async function setDiscordRpcActivity(payload: RpcPayload) {
       },
       assets: {
         large_image: payload.coverArtUrl || DEFAULT_LARGE_IMAGE,
-        large_text: payload.albumName,
         small_image: DEFAULT_SMALL_IMAGE,
       },
     })
