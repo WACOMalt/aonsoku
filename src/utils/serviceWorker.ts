@@ -14,8 +14,15 @@ export function setupServiceWorker() {
     return
   }
 
-  void import('virtual:pwa-register').then(({ registerSW }) => {
-    registerSW({ immediate: true })
+  // Registered directly rather than through virtual:pwa-register so the
+  // build does not need workbox-window. The generated worker is built with
+  // registerType 'autoUpdate', so it claims clients and skips waiting on
+  // its own.
+  window.addEventListener('load', () => {
+    const url = new URL('sw.js', document.baseURI).href
+    navigator.serviceWorker.register(url).catch((error) => {
+      console.error('[ServiceWorker] Registration failed:', error)
+    })
   })
 }
 
