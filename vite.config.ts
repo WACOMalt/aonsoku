@@ -10,6 +10,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Registration is done from the app so it can be skipped in the
+      // Capacitor build, where a precaching worker only risks serving assets
+      // from an older APK.
+      injectRegister: null,
       includeAssets: ['icon.svg', 'default_album_art.png'],
       manifest: false, // Use the existing site.webmanifest
       workbox: {

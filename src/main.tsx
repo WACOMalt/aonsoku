@@ -15,8 +15,10 @@ import App from '@/App'
 
 import { queryClient } from '@/lib/queryClient'
 import { blockFeatures } from '@/utils/browser'
+import { setupServiceWorker } from '@/utils/serviceWorker'
 
 blockFeatures()
+setupServiceWorker()
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>
