@@ -20,6 +20,7 @@ import {
   TooltipTrigger,
 } from '@/app/components/ui/tooltip'
 import { useIsMobile } from '@/app/hooks/use-mobile'
+import { useSwipe } from '@/app/hooks/use-swipe'
 import { cn } from '@/lib/utils'
 import { useMainDrawerState } from '@/store/player.store'
 
@@ -121,6 +122,11 @@ function MainSidebarProvider({
   // This makes it easier to style the sidebar with Tailwind classes.
   const state = open ? 'expanded' : 'collapsed'
 
+  // On mobile, swiping right anywhere that does not handle its own
+  // horizontal gestures opens the sidebar sheet.
+  const openMobileSidebar = React.useCallback(() => setOpenMobile(true), [])
+  const openSwipe = useSwipe({ onSwipeRight: openMobileSidebar })
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: necessary to work properly
   const contextValue = React.useMemo<MainSidebarContextProps>(
     () => ({
@@ -160,6 +166,7 @@ function MainSidebarProvider({
             'max-md:pb-[calc(var(--player-height)+var(--bottom-nav-height))]',
             className,
           )}
+          {...(isMobile ? openSwipe : {})}
           {...props}
         >
           {children}
@@ -182,6 +189,26 @@ function MainSidebar({
   collapsible?: 'offcanvas' | 'icon' | 'none'
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useMainSidebar()
+
+  // Mobile sheet: swipe it towards its own edge to close, and close it as
+  // soon as a navigation link inside it is tapped so the selected content
+  // is visible right away.
+  const closeMobileSidebar = React.useCallback(
+    () => setOpenMobile(false),
+    [setOpenMobile],
+  )
+  const closeSwipe = useSwipe(
+    side === 'left'
+      ? { onSwipeLeft: closeMobileSidebar }
+      : { onSwipeRight: closeMobileSidebar },
+  )
+  const handleMobileClickCapture = React.useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('a[href]')) closeMobileSidebar()
+    },
+    [closeMobileSidebar],
+  )
 
   if (collapsible === 'none') {
     return (
@@ -212,6 +239,8 @@ function MainSidebar({
             } as React.CSSProperties
           }
           side={side}
+          onClickCapture={handleMobileClickCapture}
+          {...closeSwipe}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>MainSidebar</SheetTitle>
