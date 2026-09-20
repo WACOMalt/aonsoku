@@ -71,12 +71,13 @@ export default function ArtistsList() {
           <MemoDataTable
             columns={columns}
             data={artists}
-            showPagination={true}
+            showPagination={false}
             showSearch={true}
             searchColumn="name"
             handlePlaySong={(row) => handlePlayArtistRadio(row.original)}
             allowRowSelection={false}
             dataType="artist"
+            enableVirtualization={true}
           />
         </MemoListWrapper>
       )}
