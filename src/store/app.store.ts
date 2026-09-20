@@ -606,3 +606,6 @@ export const useAppCaches = () =>
 
 export const useAppMediaCache = () =>
   useAppStore((state) => state.pages.mediaCacheEnabled)
+
+export const useAppImageCache = () =>
+  useAppStore((state) => state.pages.imagesCacheLayerEnabled)

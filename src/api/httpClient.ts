@@ -106,6 +106,29 @@ export async function httpClient<T>(
   }
 }
 
+/**
+ * The server resizes and re-encodes artwork on demand, and caches the result
+ * per requested pixel size. Asking for a dozen slightly different sizes means
+ * a dozen resize jobs and a dozen cache entries for one cover, which thrashes
+ * the server cache and is slow on modest hardware. Every request is therefore
+ * snapped to one of a few buckets.
+ */
+const COVER_ART_SIZES = [128, 300, 512, 768]
+
+export function normalizeCoverArtSize(size: string | number): string {
+  const requested = Number(size)
+
+  if (!Number.isFinite(requested) || requested <= 0) {
+    return String(COVER_ART_SIZES[1])
+  }
+
+  const bucket =
+    COVER_ART_SIZES.find((value) => value >= requested) ??
+    COVER_ART_SIZES[COVER_ART_SIZES.length - 1]
+
+  return String(bucket)
+}
+
 export function getSimpleCoverArtUrl(
   id?: string,
   type: CoverArt = 'album',
@@ -117,7 +140,7 @@ export function getSimpleCoverArtUrl(
     return `/default_${resolvedType}_art.png`
   }
 
-  return getUrl('getCoverArt', { id, size })
+  return getUrl('getCoverArt', { id, size: normalizeCoverArtSize(size) })
 }
 
 export async function getCoverArtUrl(

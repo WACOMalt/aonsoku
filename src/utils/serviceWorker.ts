@@ -10,7 +10,7 @@ export function setupServiceWorker() {
   if (!('serviceWorker' in navigator)) return
 
   if (isCapacitor()) {
-    void unregisterServiceWorkers()
+    unregisterServiceWorkers()
     return
   }
 

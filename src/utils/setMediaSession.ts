@@ -3,7 +3,9 @@ import { usePlayerStore } from '@/store/player.store'
 import { EpisodeWithPodcast } from '@/types/responses/podcasts'
 import { ISong } from '@/types/responses/song'
 
-const artworkSizes = ['96', '128', '192', '256', '384', '512']
+// Two entries is enough for the OS to pick a sensible one, and keeps the
+// server from resizing the same cover six times for a single track.
+const artworkSizes = ['128', '512']
 
 function removeMediaSession() {
   if (!navigator.mediaSession) return

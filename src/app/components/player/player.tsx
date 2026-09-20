@@ -264,7 +264,6 @@ export function Player() {
           </div>
 
           {/* Row 1: Main controls */}
-          {/* biome-ignore lint: mobile-only tap handler, no keyboard needed */}
           <div
             className="flex items-center gap-2 px-3 h-12 shrink-0 cursor-pointer"
             onClick={(e) => {

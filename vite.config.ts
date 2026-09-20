@@ -20,6 +20,23 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         runtimeCaching: [
           {
+            // Cover art ids embed a hash of the artwork, so a given URL always
+            // returns the same image and the server marks it immutable. Serve
+            // it straight from cache instead of revalidating, which otherwise
+            // sends every thumbnail back to the music server on each visit.
+            urlPattern: /\/rest\/getCoverArt/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'cover-art',
+              expiration: {
+                maxEntries: 3000,
+                maxAgeSeconds: 60 * 60 * 24 * 90,
+                purgeOnQuotaError: true,
+              },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             urlPattern: /\/rest\//,
             handler: 'NetworkFirst',
             options: {
