@@ -1,16 +1,7 @@
-import { Settings2 } from 'lucide-react'
-import { ComponentPropsWithoutRef } from 'react'
+import { LayoutGrid, List } from 'lucide-react'
+import { ComponentPropsWithoutRef, ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Badge } from '@/app/components/ui/badge'
-import { Button } from '@/app/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/app/components/ui/dropdown-menu'
+import { SimpleTooltip } from '@/app/components/ui/simple-tooltip'
 import { cn } from '@/lib/utils'
 import { PageViewType } from '@/types/serverConfig'
 
@@ -40,33 +31,65 @@ export function MainViewTypeSelector({
   const { t } = useTranslation()
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="size-9">
-          <Settings2 className="size-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="min-w-40">
-        <DropdownMenuLabel className="text-muted-foreground font-medium">
-          {t('generic.viewMode.label')}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuCheckboxItem
-          checked={viewType === 'table'}
-          onCheckedChange={() => setViewType('table')}
-        >
-          <span>{t('generic.viewMode.modes.list')}</span>
-        </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem
-          checked={viewType === 'grid'}
-          onCheckedChange={() => setViewType('grid')}
-        >
-          <span>{t('generic.viewMode.modes.poster')}</span>
-          <Badge className="ml-2" variant="beta">
-            {t('generic.beta')}
-          </Badge>
-        </DropdownMenuCheckboxItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div
+      role="group"
+      aria-label={t('generic.viewMode.label')}
+      className="inline-flex h-9 items-center overflow-hidden rounded-md border border-input bg-background"
+    >
+      <ViewTypeOption
+        label={t('generic.viewMode.modes.list')}
+        active={viewType === 'table'}
+        onClick={() => setViewType('table')}
+      >
+        <List className="size-4" />
+      </ViewTypeOption>
+
+      <ViewTypeOption
+        label={`${t('generic.viewMode.modes.poster')} (${t('generic.beta')})`}
+        active={viewType === 'grid'}
+        onClick={() => setViewType('grid')}
+        className="border-l border-input"
+      >
+        <LayoutGrid className="size-4" />
+      </ViewTypeOption>
+    </div>
+  )
+}
+
+type ViewTypeOptionProps = {
+  label: string
+  active: boolean
+  onClick: () => void
+  className?: string
+  children: ReactNode
+}
+
+function ViewTypeOption({
+  label,
+  active,
+  onClick,
+  className,
+  children,
+}: ViewTypeOptionProps) {
+  return (
+    <SimpleTooltip text={label}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
+        onClick={onClick}
+        className={cn(
+          'inline-flex h-full w-9 items-center justify-center transition-colors',
+          'ring-offset-background focus-visible:outline-none focus-visible:ring-2',
+          'focus-visible:ring-ring focus-visible:ring-inset',
+          active
+            ? 'bg-accent text-accent-foreground'
+            : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground',
+          className,
+        )}
+      >
+        {children}
+      </button>
+    </SimpleTooltip>
   )
 }
