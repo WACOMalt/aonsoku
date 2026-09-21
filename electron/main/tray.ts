@@ -6,7 +6,7 @@ import { productName } from '../../package.json'
 import { getMacOsMediaIcon } from './core/macMedia'
 import {
   getDisplaysMaxScaleFactor,
-  getVariantForScaleFactor,
+  getLinuxTrayVariant,
   NativeIconVariants,
 } from './core/nativeIcons'
 import { sendPlayerEvents } from './core/playerEvents'
@@ -35,15 +35,10 @@ function getTrayIcon(): NativeImage {
     // Use a single tray icon for Linux, as it does not support scale factors.
     // We choose the best icon based on the highest display scale factor.
     const scaleFactor = getDisplaysMaxScaleFactor()
-    const variant = getVariantForScaleFactor(scaleFactor)
+    const variant = getLinuxTrayVariant(scaleFactor)
     const iconPath = getTrayIconPath(variant.size)
-    const buffer = readFileSync(iconPath)
 
-    image = nativeImage.createFromBuffer(buffer, {
-      scaleFactor: 1.0,
-      width: variant.size,
-      height: variant.size,
-    })
+    image = nativeImage.createFromPath(iconPath)
   } else {
     // Windows/macOS: Responsive tray icons
     image = nativeImage.createEmpty()

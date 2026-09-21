@@ -24,3 +24,21 @@ export function getVariantForScaleFactor(scaleFactor: number) {
 
   return match ?? NativeIconVariant.Size32
 }
+
+/**
+ * Linux tray slots are sized by the panel, not by the display scale factor,
+ * and commonly land anywhere between 22 and 48 logical pixels. Electron
+ * cannot attach several representations to a Linux tray icon, so it gets one
+ * bitmap; picking by scale factor alone handed a 16px image to a 22px slot
+ * and the upscale looked blurry. Asking for an asset at least as large as the
+ * biggest slot we expect keeps the toolkit downscaling, which stays sharp.
+ */
+const LINUX_TRAY_SLOT_SIZE = 48
+
+export function getLinuxTrayVariant(scaleFactor: number) {
+  const target = LINUX_TRAY_SLOT_SIZE * Math.max(1, scaleFactor)
+
+  const match = NativeIconVariants.find((variant) => variant.size >= target)
+
+  return match ?? NativeIconVariant.Size256
+}
