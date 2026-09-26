@@ -19,6 +19,10 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <!-- Shows through wherever the system bars inset the WebView. The
+             platform default is a near-white grey, which framed the app in a
+             pale border in landscape. -->
+        <item name="android:windowBackground">@android:color/black</item>
     </style>
 
 
