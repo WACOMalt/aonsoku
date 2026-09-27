@@ -2,18 +2,14 @@ import { redirect } from 'react-router-dom'
 import { ROUTES } from '@/routes/routesList'
 import { subsonic } from '@/service/subsonic'
 import { useAppStore } from '@/store/app.store'
-import { useJamStore } from '@/store/jam.store'
+import { requestJamJoin } from '@/utils/jamLinks'
 
 /**
- * Check if the current URL hash contains a jam invite path (e.g. #/jam/abc1234)
- * and persist the session ID so we can prompt the user to join after login.
+ * If the URL is a Jam invite, remember it so the join prompt appears right
+ * after login. The pending invite is persisted, so it survives the redirect.
  */
 function savePendingJamSessionId() {
-  const hash = window.location.hash || ''
-  const jamMatch = hash.match(/#\/jam\/(.+)/)
-  if (jamMatch) {
-    useJamStore.getState().actions.setPendingJamSessionId(jamMatch[1])
-  }
+  requestJamJoin(window.location.href)
 }
 
 export async function protectedLoader() {

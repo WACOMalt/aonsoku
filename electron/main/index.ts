@@ -1,5 +1,10 @@
 import { electronApp, optimizer, platform } from '@electron-toolkit/utils'
 import { app } from 'electron'
+import {
+  deliverDeepLink,
+  findDeepLink,
+  registerDeepLinkProtocol,
+} from './core/deepLinks'
 import { createAppMenu } from './core/menu'
 import { initAutoUpdater } from './core/updater'
 import { createWindow, mainWindow } from './window'
@@ -19,7 +24,17 @@ if (!instanceLock) {
 } else {
   createAppMenu()
 
-  app.on('second-instance', () => {
+  // macOS delivers links through this event, possibly before 'ready'.
+  app.on('open-url', (event, url) => {
+    event.preventDefault()
+    deliverDeepLink(url)
+  })
+
+  app.on('second-instance', (_event, argv) => {
+    // Windows and Linux start a second process for a link; it lands here.
+    const link = findDeepLink(argv)
+    if (link) deliverDeepLink(link)
+
     if (!mainWindow || mainWindow.isDestroyed()) return
 
     if (mainWindow.isMinimized()) {
@@ -33,6 +48,7 @@ if (!instanceLock) {
 
   app.whenReady().then(() => {
     electronApp.setAppUserModelId('com.victoralvesf.aonsoku')
+    registerDeepLinkProtocol()
 
     initAutoUpdater()
     createWindow()

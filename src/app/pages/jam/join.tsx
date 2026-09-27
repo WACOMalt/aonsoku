@@ -1,27 +1,18 @@
 import { useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useJamStore } from '@/store/jam.store'
 import { ROUTES } from '@/routes/routesList'
+import { requestJamJoin } from '@/utils/jamLinks'
 
+/**
+ * Landing route for invite links. Records the invite and moves on; the join
+ * prompt in the layout decides what to ask for the listener's current state.
+ */
 export default function JamJoin() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const navigate = useNavigate()
 
   useEffect(() => {
-    if (!sessionId) {
-      navigate(ROUTES.LIBRARY.HOME, { replace: true })
-      return
-    }
-
-    // If already in this session, just go home
-    const currentId = useJamStore.getState().id
-    if (currentId === sessionId) {
-      navigate(ROUTES.LIBRARY.HOME, { replace: true })
-      return
-    }
-
-    // Set the pending session ID — the JamJoinPrompt will show the confirmation dialog
-    useJamStore.getState().actions.setPendingJamSessionId(sessionId)
+    if (sessionId) requestJamJoin(sessionId)
     navigate(ROUTES.LIBRARY.HOME, { replace: true })
   }, [sessionId, navigate])
 

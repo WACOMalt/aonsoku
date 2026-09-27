@@ -35,6 +35,8 @@ export enum IpcChannels {
   UpdateError = 'update-error',
   DownloadProgress = 'download-progress',
   UpdateDownloaded = 'update-downloaded',
+  DeepLink = 'deep-link',
+  GetPendingDeepLink = 'get-pending-deep-link',
 }
 
 export type OverlayColors = {
@@ -84,6 +86,10 @@ export interface IAonsokuAPI {
   checkForUpdates: () => Promise<UpdateCheckResult | null>
   downloadUpdate: () => void
   quitAndInstall: () => void
+  /** Resolves to a waiting aonsoku:// link, or null, and clears it. */
+  getPendingDeepLink: () => Promise<string | null>
+  /** Called whenever a new link is waiting; fetch it with getPendingDeepLink. */
+  onDeepLink: (func: () => void) => void
   onUpdateAvailable: (callback: (info: UpdateInfo) => void) => void
   onUpdateNotAvailable: (callback: () => void) => void
   onUpdateError: (callback: (error: string) => void) => void

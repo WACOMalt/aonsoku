@@ -20,6 +20,12 @@ const TITLES = {
   'host-ended': 'The host ended the Jam',
   left: 'You left the Jam',
   ended: 'You ended the Jam',
+  expired: 'That Jam has ended',
+} as const
+
+const NOTICES = {
+  'host-ended': 'The host ended the Jam.',
+  expired: 'That Jam has ended.',
 } as const
 
 /**
@@ -34,8 +40,8 @@ export function JamEndPrompt() {
   // Nothing to restore: just let a guest know why the music moved on.
   useEffect(() => {
     if (!endPrompt || endPrompt.canRestore) return
-    if (endPrompt.reason === 'host-ended') {
-      toast.info('The host ended the Jam.')
+    if (endPrompt.reason === 'host-ended' || endPrompt.reason === 'expired') {
+      toast.info(NOTICES[endPrompt.reason])
     }
     setEndPrompt(null)
   }, [endPrompt, setEndPrompt])

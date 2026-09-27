@@ -14,6 +14,7 @@ import {
   MainSidebarProvider,
 } from '@/app/components/ui/main-sidebar'
 import { useConnect } from '@/app/hooks/use-connect'
+import { useJamRejoin } from '@/app/hooks/use-jam-rejoin'
 import { Header } from '@/app/layout/header'
 import { MainRoutes } from './main'
 
@@ -27,6 +28,7 @@ const MemoMobileBottomNav = memo(MobileBottomNav)
 
 export default function BaseLayout() {
   useConnect()
+  useJamRejoin()
 
   return (
     <div className="h-screen w-screen overflow-hidden">

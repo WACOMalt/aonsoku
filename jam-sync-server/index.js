@@ -128,7 +128,9 @@ io.on('connection', (socket) => {
   // Only the handshake-verified username is trusted. Any username or isLead
   // in the query string is ignored.
   const username = socket.data.username;
-  const { sessionId, deviceName, sessionType } = socket.handshake.query;
+  // mode: 'create' starts a session, 'join' only enters an existing one.
+  // Clients that predate it send neither and get the old create-or-join.
+  const { sessionId, deviceName, sessionType, mode } = socket.handshake.query;
 
   // Determine session type: 'private' or 'jam' (default to 'jam' for backward compat)
   const resolvedSessionType = sessionType || 'jam';
@@ -264,6 +266,13 @@ io.on('connection', (socket) => {
     if (typeof sessionId !== 'string' || !SESSION_ID_PATTERN.test(sessionId)) {
       console.log(`[Jam] Rejected connection: invalid session id`);
       return socket.disconnect();
+    }
+
+    if (!jamSessions[sessionId] && mode === 'join') {
+      // An invite link to a Jam that has ended must not quietly start a new
+      // session with the invitee as its host.
+      socket.emit('jam_error', { code: 'session_not_found' });
+      return socket.disconnect(true);
     }
 
     socket.join(sessionId);

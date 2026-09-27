@@ -15,10 +15,12 @@ import App from '@/App'
 
 import { queryClient } from '@/lib/queryClient'
 import { blockFeatures } from '@/utils/browser'
+import { initDeepLinks } from '@/utils/deepLinks'
 import { setupServiceWorker } from '@/utils/serviceWorker'
 
 blockFeatures()
 setupServiceWorker()
+initDeepLinks()
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>

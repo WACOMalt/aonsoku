@@ -24,6 +24,10 @@ class JamService {
   // The queue last sent to the server. Updates only carry the queue when it
   // changes; reset on every connect so a fresh server session gets it once.
   private lastSentQueue: ISong[] | null = null
+  // True while joining because the listener was already in a Jam (switching,
+  // or rejoining after a reload). Their pre-Jam queue is then still the one
+  // saved before that earlier Jam, and must not be overwritten.
+  private keepSnapshot = false
 
   get isSyncing() {
     return this._isSyncing
@@ -59,7 +63,12 @@ class JamService {
     )
   }
 
-  connect() {
+  /**
+   * Opens the socket for the Jam in the store. `create` starts the session
+   * if it does not exist; `join` only enters an existing one, so a stale
+   * invite cannot make the invitee host of an empty Jam.
+   */
+  connect(mode: 'create' | 'join') {
     this.init()
 
     const { id: sessionId, isLead } = useJamStore.getState()
@@ -67,7 +76,13 @@ class JamService {
     const { setConnected, setConnecting, setError, setParticipants } =
       useJamStore.getState().actions
 
-    if (!sessionId || this.socket?.connected) return
+    if (!sessionId) return
+    // Never leave an old socket running alongside the new one.
+    if (this.socket) {
+      this.socket.removeAllListeners()
+      this.socket.disconnect()
+      this.socket = null
+    }
 
     const syncUrl = getSyncServerUrl()
     if (!syncUrl) {
@@ -94,7 +109,7 @@ class JamService {
       path: '/jam-sync/socket.io', // Proxy-compatible path
       // The server verifies `auth` and decides who hosts. username and isLead
       // are only read by sync servers that predate authentication.
-      query: { sessionId, username, isLead: String(isLead) },
+      query: { sessionId, mode, username, isLead: String(isLead) },
       auth,
     })
 
@@ -143,6 +158,18 @@ class JamService {
       },
     )
 
+    this.socket.on('jam_error', ({ code }: { code: string }) => {
+      if (code !== 'session_not_found') return
+      this.socket?.removeAllListeners()
+      this.socket?.disconnect()
+      this.socket = null
+      useJamStore.getState().actions.reset()
+      // Nothing played yet in this Jam, so a snapshot saved for it is moot.
+      if (!this.keepSnapshot) clearJamSnapshot()
+      this.keepSnapshot = false
+      this.finishJam('expired')
+    })
+
     this.socket.on('session_ended', () => {
       this.socket?.disconnect()
       this.socket = null
@@ -177,31 +204,37 @@ class JamService {
     if (queueChanged) this.lastSentQueue = songlist.currentList
   }
 
-  disconnect() {
+  /** Leaves the Jam. `silent` skips the restore prompt when switching Jams. */
+  disconnect({ silent = false }: { silent?: boolean } = {}) {
     if (this.socket) {
       this.socket.emit('leave_session')
+      this.socket.removeAllListeners()
       this.socket.disconnect()
       this.socket = null
     }
     useJamStore.getState().actions.reset()
-    this.finishJam('left')
+    if (silent) this.lastSentQueue = null
+    else this.finishJam('left')
   }
 
-  endSession() {
+  /** Ends the Jam for everyone. `silent` skips the restore prompt. */
+  endSession({ silent = false }: { silent?: boolean } = {}) {
     if (this.socket) {
       this.socket.emit('end_session')
+      this.socket.removeAllListeners()
       this.socket.disconnect()
       this.socket = null
     }
     useJamStore.getState().actions.reset()
-    this.finishJam('ended')
+    if (silent) this.lastSentQueue = null
+    else this.finishJam('ended')
   }
 
   /**
    * Offers to restore what was playing before the Jam, when there is
    * something to restore. Otherwise just tells a guest the host ended it.
    */
-  private finishJam(reason: 'host-ended' | 'left' | 'ended') {
+  private finishJam(reason: 'host-ended' | 'left' | 'ended' | 'expired') {
     this.lastSentQueue = null
     const canRestore = loadJamSnapshot() !== null
     if (!canRestore) clearJamSnapshot()
@@ -311,39 +344,52 @@ class JamService {
 
   createSession() {
     const sessionId = createSessionId()
+    this.keepSnapshot = false
     saveJamSnapshot()
     useJamStore.getState().actions.setSession(sessionId, true)
-    this.connect()
+    this.connect('create')
     return sessionId
   }
 
-  joinSession(sessionId: string) {
-    // Handle full invite URLs in both formats:
-    //   https://mus.bsums.xyz/#/jam/abc123  (hash router — hash contains the path)
-    //   https://mus.bsums.xyz/jam/abc123    (plain path)
-    let resolvedId = sessionId.trim()
-    try {
-      const url = new URL(resolvedId)
-      // Hash router: hash is like "#/jam/abc123"
-      const hashPath = url.hash.replace(/^#\/?/, '') // strip leading "#" or "#/"
-      const hashParts = hashPath.split('/')
-      const hashJamIndex = hashParts.indexOf('jam')
-      if (hashJamIndex !== -1 && hashParts[hashJamIndex + 1]) {
-        resolvedId = hashParts[hashJamIndex + 1]
-      } else {
-        // Plain path: pathname is like "/jam/abc123"
-        const pathParts = url.pathname.split('/')
-        const pathJamIndex = pathParts.indexOf('jam')
-        if (pathJamIndex !== -1 && pathParts[pathJamIndex + 1]) {
-          resolvedId = pathParts[pathJamIndex + 1]
-        }
-      }
-    } catch {
-      // Not a URL, use as-is
+  /**
+   * Joins a Jam, leaving any Jam the listener is currently in. The queue
+   * saved before their first Jam is kept, so restoring later goes back to
+   * what they had before any of it.
+   */
+  switchToSession(sessionId: string) {
+    const { id, isConnected, isConnecting, isLead } = useJamStore.getState()
+    if (id === sessionId && (isConnected || isConnecting)) return
+
+    const wasInJam = !!id && (isConnected || isConnecting)
+    if (wasInJam) {
+      if (isLead) this.endSession({ silent: true })
+      else this.disconnect({ silent: true })
+    } else if (id) {
+      // A Jam id left over from before a reload that never reconnected.
+      useJamStore.getState().actions.reset()
     }
-    saveJamSnapshot()
-    useJamStore.getState().actions.setSession(resolvedId, false)
-    this.connect()
+
+    this.keepSnapshot = wasInJam
+    if (!wasInJam) saveJamSnapshot()
+    useJamStore.getState().actions.setSession(sessionId, false)
+    this.connect('join')
+  }
+
+  /** Kept for callers that join from a plain id without switching logic. */
+  joinSession(sessionId: string) {
+    this.switchToSession(sessionId)
+  }
+
+  /**
+   * After a reload the store still names the Jam the listener was in, but
+   * nothing is connected. Rejoin it: a host recreates it if everyone left,
+   * a guest only rejoins if it still exists.
+   */
+  rejoinPersistedSession() {
+    const { id, isConnected, isConnecting, isLead } = useJamStore.getState()
+    if (!id || isConnected || isConnecting || this.socket) return
+    this.keepSnapshot = true
+    this.connect(isLead ? 'create' : 'join')
   }
 }
 

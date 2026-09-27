@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "xyz.bsums.aonsoku",
+      "sha256_cert_fingerprints": [
+        "F6:0E:93:2D:D4:46:D7:AE:96:24:1E:AC:48:C1:D7:76:10:FC:8A:73:B3:66:97:8D:69:7F:16:A4:A4:BD:EE:AF"
+      ]
+    }
+  }
+]

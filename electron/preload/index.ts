@@ -65,6 +65,10 @@ const api: IAonsokuAPI = {
   checkForUpdates: () => ipcRenderer.invoke(IpcChannels.CheckForUpdates),
   downloadUpdate: () => ipcRenderer.send(IpcChannels.DownloadUpdate),
   quitAndInstall: () => ipcRenderer.send(IpcChannels.QuitAndInstall),
+  getPendingDeepLink: () => ipcRenderer.invoke(IpcChannels.GetPendingDeepLink),
+  onDeepLink: (func) => {
+    ipcRenderer.on(IpcChannels.DeepLink, () => func())
+  },
   onUpdateAvailable: (callback) => {
     ipcRenderer.on(IpcChannels.UpdateAvailable, (_, info) => callback(info))
   },

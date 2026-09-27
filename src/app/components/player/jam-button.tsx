@@ -13,10 +13,9 @@ import { Input } from '@/app/components/ui/input'
 import { SimpleTooltip } from '@/app/components/ui/simple-tooltip'
 import { Slider } from '@/app/components/ui/slider'
 import { Switch } from '@/app/components/ui/switch'
-import { ROUTES } from '@/routes/routesList'
 import { jamService } from '@/service/jam'
 import { useJamActions, useJamState } from '@/store/jam.store'
-import { getSyncServerUrl } from '@/utils/syncServerUrl'
+import { buildJamInviteLink, parseJamSessionId } from '@/utils/jamLinks'
 
 export function JamButton() {
   const {
@@ -38,10 +37,13 @@ export function JamButton() {
   }
 
   const handleJoin = () => {
-    if (joinId.trim()) {
-      jamService.joinSession(joinId.trim())
-      setJoinId('')
+    const sessionId = parseJamSessionId(joinId)
+    if (!sessionId) {
+      toast.error("That doesn't look like a Jam link or session ID.")
+      return
     }
+    jamService.switchToSession(sessionId)
+    setJoinId('')
   }
 
   const handleLeave = () => {
@@ -55,11 +57,8 @@ export function JamButton() {
   }
 
   const copyLink = () => {
-    // Use sync server URL so the link works in Electron/Capacitor
-    // where window.location.origin is file:// or https://localhost
-    const baseUrl = getSyncServerUrl() ?? window.location.origin
-    const link = `${baseUrl}/#${ROUTES.JAM.JOIN(id!)}`
-    navigator.clipboard.writeText(link)
+    // A path link (not #/jam/...) so the Android app can claim it.
+    navigator.clipboard.writeText(buildJamInviteLink(id!))
     toast.success('Invite link copied!')
   }
 

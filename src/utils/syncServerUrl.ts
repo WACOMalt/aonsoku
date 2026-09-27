@@ -33,6 +33,13 @@ export function getSyncServerUrl(): string | null {
     return configured
   }
 
+  // Release builds of the apps ship with this deployment's server, so Jam
+  // and Connect work on a fresh install, including from an invite link.
+  const buildDefault = import.meta.env.VITE_DEFAULT_SYNC_SERVER_URL
+  if (buildDefault) {
+    return buildDefault
+  }
+
   // No usable URL — caller should surface an error to the user.
   return null
 }

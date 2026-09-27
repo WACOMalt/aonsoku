@@ -61,6 +61,12 @@ linux:
   category: AudioVideo
   synopsis: 'A modern desktop music client for Navidrome and OpenSubsonic servers.'
 
+# aonsoku://jam/<id> invite links open in the desktop app.
+protocols:
+  - name: Aonsoku Jam
+    schemes:
+      - aonsoku
+
 npmRebuild: true
 nativeRebuilder: legacy
 
