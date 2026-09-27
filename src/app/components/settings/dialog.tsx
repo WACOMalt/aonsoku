@@ -49,32 +49,36 @@ export function SettingsDialog() {
         <DialogTitle className="sr-only">{t('settings.label')}</DialogTitle>
 
         {isMobile ? (
-          /* Mobile layout: two-panel navigation */
-          <div className="flex flex-col h-full overflow-hidden bg-background-foreground">
-            {showCategoryList ? (
-              /* Mobile: Category list view */
-              <div className="flex flex-col h-full">
-                <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-                  <h2 className="text-lg font-semibold">
-                    {t('settings.label')}
-                  </h2>
-                </header>
-                <ScrollArea className="flex-1 overflow-hidden">
-                  <SettingsOptions onCategorySelect={handleCategorySelect} />
-                </ScrollArea>
-              </div>
-            ) : (
-              /* Mobile: Settings page view with back navigation */
-              <div className="flex flex-col h-full">
-                <SettingsBreadcrumb onBack={handleBack} />
-                <ScrollArea className="flex-1 overflow-hidden">
-                  <div className="w-full h-full gap-4 p-4 pt-0">
-                    <Pages />
-                  </div>
-                </ScrollArea>
-              </div>
-            )}
-          </div>
+          /* Mobile layout: two-panel navigation. SettingsOptions renders
+             SidebarMenuButton, which needs a SidebarProvider; without one it
+             throws and the whole app unmounts. */
+          <SidebarProvider className="min-h-0 h-full">
+            <div className="flex flex-col h-full w-full overflow-hidden bg-background-foreground">
+              {showCategoryList ? (
+                /* Mobile: Category list view */
+                <div className="flex flex-col h-full">
+                  <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+                    <h2 className="text-lg font-semibold">
+                      {t('settings.label')}
+                    </h2>
+                  </header>
+                  <ScrollArea className="flex-1 overflow-hidden">
+                    <SettingsOptions onCategorySelect={handleCategorySelect} />
+                  </ScrollArea>
+                </div>
+              ) : (
+                /* Mobile: Settings page view with back navigation */
+                <div className="flex flex-col h-full">
+                  <SettingsBreadcrumb onBack={handleBack} />
+                  <ScrollArea className="flex-1 overflow-hidden">
+                    <div className="w-full h-full gap-4 p-4 pt-0">
+                      <Pages />
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+            </div>
+          </SidebarProvider>
         ) : (
           /* Desktop layout: sidebar + content (unchanged) */
           <SidebarProvider className="min-h-full">
