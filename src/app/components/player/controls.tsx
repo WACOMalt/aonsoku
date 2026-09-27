@@ -33,6 +33,7 @@ import { LoopState } from '@/types/playerContext'
 import { EpisodeWithPodcast } from '@/types/responses/podcasts'
 import { Radio } from '@/types/responses/radios'
 import { ISong } from '@/types/responses/song'
+import { isCapacitor } from '@/utils/platform'
 import { manageMediaSession } from '@/utils/setMediaSession'
 
 interface PlayerControlsProps {
@@ -84,10 +85,9 @@ export function PlayerControls({
   useEffect(() => {
     // On Android Capacitor, media button handlers are set up natively
     // via MediaSessionPlugin, so skip the web MediaSession API handlers.
-    const isCapacitor =
-      typeof window !== 'undefined' &&
-      !!(window as { Capacitor?: unknown }).Capacitor
-    if (isCapacitor) return
+    // This must be a native-platform check: the Capacitor global also exists
+    // on the web and in Electron, where these handlers are needed.
+    if (isCapacitor()) return
 
     if (isPodcast) {
       manageMediaSession.setPodcastHandlers({ handleSeekAction })

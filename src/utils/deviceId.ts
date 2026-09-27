@@ -1,3 +1,5 @@
+import { getNativePlatform } from './platform'
+
 // Generate a persistent device ID for this browser tab/instance
 const STORAGE_KEY = 'aonsoku-device-id'
 
@@ -16,12 +18,11 @@ export function getDeviceId(): string {
 
 export function getDeviceName(): string {
   const ua = navigator.userAgent
-  // Simple device name detection
-  if (
-    typeof (window as unknown as Record<string, unknown>).Capacitor !==
-    'undefined'
-  )
-    return 'Android App'
+  // The Capacitor global exists on every platform, so check the native
+  // platform explicitly; otherwise desktop and web report "Android App".
+  const nativePlatform = getNativePlatform()
+  if (nativePlatform === 'android') return 'Android App'
+  if (nativePlatform === 'ios') return 'iOS App'
   if (ua.includes('Electron')) return 'Desktop App'
   if (ua.includes('Chrome')) return `Chrome on ${getOS()}`
   if (ua.includes('Firefox')) return `Firefox on ${getOS()}`
