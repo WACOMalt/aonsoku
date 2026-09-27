@@ -1,5 +1,9 @@
 server {
     listen 8080;
+
+    # Redirects stay relative so they keep the public scheme and host when
+    # this runs behind a reverse proxy (otherwise they leak :8080 over http).
+    absolute_redirect off;
     
     # Enable sendfile and optimize TCP settings
     sendfile on;
