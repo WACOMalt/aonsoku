@@ -1,5 +1,5 @@
 import { Users } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'react-toastify'
 import { Button } from '@/app/components/ui/button'
 import {
@@ -31,15 +31,6 @@ export function JamButton() {
   } = useJamState()
   const { setSyncThreshold } = useJamActions()
   const [joinId, setJoinId] = useState('')
-
-  // Listen for host-ended session event from jamService
-  useEffect(() => {
-    const handler = () => {
-      toast.info('The Jam session was ended by the host.')
-    }
-    window.addEventListener('jam:session_ended', handler)
-    return () => window.removeEventListener('jam:session_ended', handler)
-  }, [])
 
   const handleCreate = () => {
     jamService.createSession()

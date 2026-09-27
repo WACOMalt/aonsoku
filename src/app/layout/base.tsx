@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { MainDrawerPage } from '@/app/components/drawer/page'
 import { FullscreenMode } from '@/app/components/fullscreen/page'
 import { MobileBottomNav } from '@/app/components/mobile/bottom-nav'
+import { JamEndPrompt } from '@/app/components/player/jam-end-prompt'
 import { JamJoinPrompt } from '@/app/components/player/jam-join-prompt'
 import { Player } from '@/app/components/player/player'
 import { CreatePlaylistDialog } from '@/app/components/playlist/form-dialog'
@@ -44,6 +45,7 @@ export default function BaseLayout() {
       <CreatePlaylistDialog />
       <MemoFullscreenMode />
       <JamJoinPrompt />
+      <JamEndPrompt />
     </div>
   )
 }

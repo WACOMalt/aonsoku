@@ -10,7 +10,7 @@ Aonsoku now has a two-layer session system:
 
 1. **Aonsoku Connect (Private Sessions)** — Automatic per-user device sync. When a user opens multiple browser tabs or devices, they share a single private session with synchronized playback state. One device is the "Active Player" (outputting audio), while others act as "Controllers" that can see and control playback remotely.
 
-2. **Music Jam (Multi-User Sessions)** — Public, multi-user sessions layered on top of private sessions. When a user creates or joins a Jam, the Jam's playback state overrides their private session. When the Jam ends, each user's pre-Jam state is restored.
+2. **Music Jam (Multi-User Sessions)** — Public, multi-user sessions layered on top of private sessions. When a user creates or joins a Jam, the Jam's playback state overrides their private session. When a Jam ends, each listener is asked whether to restore the queue they had before the Jam or carry on from where the Jam left off.
 
 For full architectural details, see [`CONNECT_ARCHITECTURE.md`](CONNECT_ARCHITECTURE.md).
 
@@ -27,7 +27,7 @@ For full architectural details, see [`CONNECT_ARCHITECTURE.md`](CONNECT_ARCHITEC
 - **Remote commands**: `command` / `remote_command` forwarding (play, pause, next, prev, seek, volume)
 - **Heartbeat & cleanup**: 30s heartbeat, 60s cleanup interval for stale devices
 - **Jam session support**: creation, joining, leaving, host ending, guest control toggling
-- **Pre-Jam state preservation**: saves and restores each user's playback state when Jam ends
+- **Pre-Jam queue restore**: saves each listener's queue on joining and, when the Jam ends, offers to restore it or continue from the Jam
 - Deployed via `docker-compose` on `potato-vps1.bsums.xyz`
 
 ### Frontend — Connect Layer
@@ -89,7 +89,10 @@ All core features are implemented and functional:
 - ✅ Host can toggle guest playback control
 - ✅ Configurable sync threshold
 - ✅ Invite link generation and URL-based joining
-- ✅ Pre-Jam state save/restore
+- ✅ Pre-Jam queue restore (offered as a choice when a Jam ends)
+- ✅ Sync server verifies every connection against Navidrome (`NAVIDROME_URL`, falling back to `SERVER_URL`)
+- ✅ Jam host is decided by the server (whoever opened the session), not claimed by the client
+- ✅ Sync updates carry the queue only when it changes
 - ✅ Heartbeat and stale device cleanup
 
 ---

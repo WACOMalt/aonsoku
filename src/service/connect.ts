@@ -5,12 +5,15 @@ import { useJamStore } from '@/store/jam.store'
 import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
 import { getDeviceName } from '@/utils/deviceId'
+import { describeSyncError, getSyncAuth } from '@/utils/syncAuth'
 import { getSyncServerUrl } from '@/utils/syncServerUrl'
 
 class ConnectService {
   private socket: Socket | null = null
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null
   private _isSyncing = false
+  // See JamService: the queue is only sent when it changes.
+  private lastSentQueue: ISong[] | null = null
 
   get isSyncing() {
     return this._isSyncing
@@ -36,20 +39,27 @@ class ConnectService {
       setThisDeviceId,
     } = useConnectStore.getState().actions
 
+    const auth = getSyncAuth()
+    if (!auth) return
+
     setConnecting(true)
 
     console.log('[Connect] Connecting to sync server at:', syncUrl)
 
     this.socket = io(syncUrl, {
       path: '/jam-sync/socket.io',
+      // The server verifies `auth` and uses that identity; `username` is only
+      // read by sync servers that predate authentication.
       query: {
         username,
         deviceName: getDeviceName(),
         sessionType: 'private',
       },
+      auth,
     })
 
     this.socket.on('connect', () => {
+      this.lastSentQueue = null
       setConnected(true)
       setConnecting(false)
       setThisDeviceId(this.socket!.id!)
@@ -63,7 +73,7 @@ class ConnectService {
     })
 
     this.socket.on('connect_error', (err) => {
-      setError(err.message)
+      setError(describeSyncError(err.message))
       setConnecting(false)
       console.error('[Connect] Connection error:', err.message)
     })
@@ -138,13 +148,17 @@ class ConnectService {
     const currentSong = songlist.currentSong
     if (!currentSong) return
 
+    const queueChanged = songlist.currentList !== this.lastSentQueue
+
     this.socket.emit('playback_update', {
       songId: currentSong.id,
       isPlaying: playerState.isPlaying,
       progress: playerProgress.progress,
-      queue: songlist.currentList,
+      ...(queueChanged ? { queue: songlist.currentList } : {}),
       timestamp: Date.now(),
     })
+
+    if (queueChanged) this.lastSentQueue = songlist.currentList
   }
 
   transferPlayback(targetDeviceId: string) {

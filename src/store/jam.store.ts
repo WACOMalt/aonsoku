@@ -11,6 +11,12 @@ export interface IJamLeadState {
   queue?: ISong[]
 }
 
+/** Why this listener's Jam ended, and whether a pre-Jam queue can be restored. */
+export interface IJamEndPrompt {
+  reason: 'host-ended' | 'left' | 'ended'
+  canRestore: boolean
+}
+
 export interface IJamParticipant {
   id: string
   name: string
@@ -32,6 +38,8 @@ export interface IJamSession {
    *  Only needed in Electron / non-HTTP contexts where window.location.origin
    *  cannot be used. Example: "https://mus.bsums.xyz" */
   syncServerUrl: string
+  /** Set when a Jam ends; drives the restore-or-continue prompt. */
+  endPrompt: IJamEndPrompt | null
 }
 
 interface IJamActions {
@@ -48,6 +56,8 @@ interface IJamActions {
   setSyncThreshold: (value: number) => void
   setPendingJamSessionId: (id: string | null) => void
   setSyncServerUrl: (url: string) => void
+  setIsLead: (value: boolean) => void
+  setEndPrompt: (prompt: IJamEndPrompt | null) => void
 }
 
 export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
@@ -66,6 +76,7 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
           syncThreshold: 2,
           pendingJamSessionId: null,
           syncServerUrl: '',
+          endPrompt: null,
           actions: {
             setSession: (sessionId, isLead) => {
               set((state) => {
@@ -142,6 +153,16 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
             setSyncServerUrl: (url) => {
               set((state) => {
                 state.syncServerUrl = url
+              })
+            },
+            setIsLead: (value) => {
+              set((state) => {
+                state.isLead = value
+              })
+            },
+            setEndPrompt: (prompt) => {
+              set((state) => {
+                state.endPrompt = prompt
               })
             },
           },

@@ -3,6 +3,16 @@ import { useAppStore } from '@/store/app.store'
 import { useJamStore } from '@/store/jam.store'
 import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
+import {
+  clearJamSnapshot,
+  loadJamSnapshot,
+  saveJamSnapshot,
+} from '@/utils/jamSnapshot'
+import {
+  createSessionId,
+  describeSyncError,
+  getSyncAuth,
+} from '@/utils/syncAuth'
 import { getSyncServerUrl } from '@/utils/syncServerUrl'
 
 class JamService {
@@ -11,6 +21,9 @@ class JamService {
   // Suppresses both the drift-correction subscriber AND the emit subscriber
   // while we are applying a remote sync, preventing feedback loops
   private _isSyncing = false
+  // The queue last sent to the server. Updates only carry the queue when it
+  // changes; reset on every connect so a fresh server session gets it once.
+  private lastSentQueue: ISong[] | null = null
 
   get isSyncing() {
     return this._isSyncing
@@ -67,24 +80,39 @@ class JamService {
       return
     }
 
+    const auth = getSyncAuth()
+    if (!auth) {
+      setError('Sign in again to use Jam.')
+      return
+    }
+
     setConnecting(true)
 
     console.log('[Jam] Connecting to sync server at:', syncUrl)
 
     this.socket = io(syncUrl, {
       path: '/jam-sync/socket.io', // Proxy-compatible path
+      // The server verifies `auth` and decides who hosts. username and isLead
+      // are only read by sync servers that predate authentication.
       query: { sessionId, username, isLead: String(isLead) },
+      auth,
     })
 
     this.socket.on('connect', () => {
+      this.lastSentQueue = null
       setConnected(true)
       setConnecting(false)
       console.log('[Jam] Connected to sync server')
     })
 
     this.socket.on('connect_error', (err) => {
-      setError(err.message)
+      setError(describeSyncError(err.message))
       setConnecting(false)
+    })
+
+    // The server decides who hosts; correct our local idea of it.
+    this.socket.on('jam_role', ({ isLead }: { isLead: boolean }) => {
+      useJamStore.getState().actions.setIsLead(isLead)
     })
 
     this.socket.on('participants_update', (participants) => {
@@ -119,8 +147,7 @@ class JamService {
       this.socket?.disconnect()
       this.socket = null
       useJamStore.getState().actions.reset()
-      // Use a custom event to avoid circular deps with toast
-      window.dispatchEvent(new CustomEvent('jam:session_ended'))
+      this.finishJam('host-ended')
     })
   }
 
@@ -134,13 +161,20 @@ class JamService {
 
     if (!currentSong) return
 
+    // The queue can be hundreds of full song objects, so send it only when
+    // it has changed. The store replaces the array on every edit, so a
+    // reference comparison is enough.
+    const queueChanged = songlist.currentList !== this.lastSentQueue
+
     this.socket.emit('playback_update', {
       songId: currentSong.id,
       isPlaying: playerState.isPlaying,
       progress: playerProgress.progress,
-      queue: songlist.currentList,
+      ...(queueChanged ? { queue: songlist.currentList } : {}),
       timestamp: Date.now(),
     })
+
+    if (queueChanged) this.lastSentQueue = songlist.currentList
   }
 
   disconnect() {
@@ -150,6 +184,7 @@ class JamService {
       this.socket = null
     }
     useJamStore.getState().actions.reset()
+    this.finishJam('left')
   }
 
   endSession() {
@@ -159,6 +194,18 @@ class JamService {
       this.socket = null
     }
     useJamStore.getState().actions.reset()
+    this.finishJam('ended')
+  }
+
+  /**
+   * Offers to restore what was playing before the Jam, when there is
+   * something to restore. Otherwise just tells a guest the host ended it.
+   */
+  private finishJam(reason: 'host-ended' | 'left' | 'ended') {
+    this.lastSentQueue = null
+    const canRestore = loadJamSnapshot() !== null
+    if (!canRestore) clearJamSnapshot()
+    useJamStore.getState().actions.setEndPrompt({ reason, canRestore })
   }
 
   setGuestControl(canControl: boolean) {
@@ -263,7 +310,8 @@ class JamService {
   }
 
   createSession() {
-    const sessionId = Math.random().toString(36).substring(2, 9)
+    const sessionId = createSessionId()
+    saveJamSnapshot()
     useJamStore.getState().actions.setSession(sessionId, true)
     this.connect()
     return sessionId
@@ -293,6 +341,7 @@ class JamService {
     } catch {
       // Not a URL, use as-is
     }
+    saveJamSnapshot()
     useJamStore.getState().actions.setSession(resolvedId, false)
     this.connect()
   }

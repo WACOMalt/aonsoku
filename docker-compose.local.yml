@@ -14,3 +14,6 @@ services:
       - APP_AUTH_TYPE=${APP_AUTH_TYPE}
       - SERVER_URL=${SERVER_URL}
       - HIDE_SERVER=${HIDE_SERVER}
+      # Navidrome server the Jam / Connect sync server verifies logins against.
+      # Falls back to SERVER_URL when unset.
+      - NAVIDROME_URL=${NAVIDROME_URL:-}
