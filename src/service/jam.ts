@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client'
+import { connectService } from '@/service/connect'
 import { useAppStore } from '@/store/app.store'
 import { useJamStore } from '@/store/jam.store'
 import { usePlayerStore } from '@/store/player.store'
@@ -77,6 +78,9 @@ class JamService {
       useJamStore.getState().actions
 
     if (!sessionId) return
+    // The Jam plays on the device the listener is using, not on another of
+    // their devices, so this one takes over audio (Connect).
+    connectService.claimControl()
     // Never leave an old socket running alongside the new one.
     if (this.socket) {
       this.socket.removeAllListeners()

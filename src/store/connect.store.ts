@@ -61,7 +61,8 @@ export const useConnectStore = create<
             // Update isActivePlayer based on this device's status
             if (s.thisDeviceId) {
               const thisDevice = devices.find((d) => d.id === s.thisDeviceId)
-              s.isActivePlayer = thisDevice?.isActivePlayer ?? true
+              // A list that does not include us yet says nothing about our role.
+              if (thisDevice) s.isActivePlayer = thisDevice.isActivePlayer
             }
           }),
         setThisDeviceId: (id) =>
@@ -96,3 +97,16 @@ export const useConnectState = () =>
     thisDeviceId: s.thisDeviceId,
     isActivePlayer: s.isActivePlayer,
   }))
+
+/**
+ * True when another of this user's devices is the one playing audio. This
+ * device then mirrors that playback without sound and acts as a remote.
+ */
+export function isPassiveConnectDevice() {
+  const { isConnected, isActivePlayer } = useConnectStore.getState()
+  return isConnected && !isActivePlayer
+}
+
+/** Whether this device may output audio (see isPassiveConnectDevice). */
+export const useCanOutputAudio = () =>
+  useConnectStore((s) => !s.isConnected || s.isActivePlayer)

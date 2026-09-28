@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { Slider } from '@/app/components/ui/slider'
+import { connectService } from '@/service/connect'
 import {
   usePlayerActions,
   usePlayerDuration,
@@ -23,6 +24,7 @@ export function MiniPlayerProgress() {
       if (audioPlayerRef) {
         audioPlayerRef.currentTime = value
       }
+      connectService.forwardSeek(value)
     },
     [audioPlayerRef],
   )

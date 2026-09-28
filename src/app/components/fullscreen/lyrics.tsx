@@ -8,6 +8,7 @@ import {
   ScrollArea,
   scrollAreaViewportSelector,
 } from '@/app/components/ui/scroll-area'
+import { connectService } from '@/service/connect'
 import { subsonic } from '@/service/subsonic'
 import { useLang } from '@/store/lang.store'
 import { usePlayerRef, usePlayerSonglist } from '@/store/player.store'
@@ -81,6 +82,7 @@ function SyncedLyrics({ lyrics }: LyricProps) {
     if (playerRef) {
       playerRef!.currentTime = timeMs / 1000
     }
+    connectService.forwardSeek(timeMs / 1000)
   }
 
   return (

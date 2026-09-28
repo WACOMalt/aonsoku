@@ -104,11 +104,32 @@ function mergePlaybackState(previous, update) {
 }
 
 // In-memory stores
-const privateSessions = {}  // { [username]: { devices: Map<socketId, Device>, playbackState: PlaybackState|null } }
+// privateSessions[user] = {
+//   devices: Map<socketId, Device>,
+//   activeKey: device key of the one device that plays audio, or null,
+//   playbackState, releaseTimer,
+// }
+// Exactly one device plays at a time. It is tracked by the client's stable
+// device key rather than its socket id, so a device that briefly reconnects
+// keeps control instead of losing it to whichever device connected first.
+const privateSessions = {}
 const jamSessions = {}      // { [sessionId]: { participants: [], lastState: null, canGuestsControl: false } }
 
 // Track which socket belongs to which session type and username
 const socketMeta = {}        // { [socketId]: { username, sessionType, sessionId? } }
+
+// How long control waits for the active device to reconnect before playback
+// is stopped. Nobody is promoted: audio starting on another device by itself
+// is worse than silence.
+const ACTIVE_RELEASE_GRACE_MS = 15000
+
+function isActiveDevice(session, device) {
+  return !!device && session.activeKey !== null && device.key === session.activeKey
+}
+
+function findDeviceBySocket(session, socketId) {
+  return session.devices.get(socketId)
+}
 
 function emitDevicesUpdate(username) {
   const session = privateSessions[username]
@@ -116,7 +137,7 @@ function emitDevicesUpdate(username) {
   const deviceList = Array.from(session.devices.values()).map(d => ({
     id: d.id,
     name: d.name,
-    isActivePlayer: d.isActivePlayer,
+    isActivePlayer: isActiveDevice(session, d),
     lastSeen: d.lastSeen
   }))
   for (const [sid] of session.devices) {
@@ -143,38 +164,56 @@ io.on('connection', (socket) => {
     if (!privateSessions[key]) {
       privateSessions[key] = {
         devices: new Map(),
-        playbackState: null
+        activeKey: null,
+        playbackState: null,
+        releaseTimer: null
       };
       console.log(`[Connect] Private session created for user: ${username}`);
     }
 
     const session = privateSessions[key];
+    // Older clients send no stable key; their socket id stands in for it.
+    const rawKey = socket.handshake.query.deviceKey;
+    const deviceKey = typeof rawKey === 'string' && rawKey ? rawKey.slice(0, 64) : socket.id;
 
-    // The FIRST device to connect becomes isActivePlayer
-    const isFirstDevice = session.devices.size === 0;
+    // The same device reconnecting: drop its old socket so that socket's
+    // eventual disconnect does not look like the device leaving.
+    for (const [sid, existing] of session.devices) {
+      if (existing.key === deviceKey) {
+        session.devices.delete(sid);
+        io.sockets.sockets.get(sid)?.disconnect(true);
+      }
+    }
 
     const device = {
       id: socket.id,
+      key: deviceKey,
       name: deviceName || 'Unknown Device',
       userAgent: socket.handshake.headers['user-agent'] || '',
-      isActivePlayer: isFirstDevice,
       lastSeen: new Date()
     };
-
     session.devices.set(socket.id, device);
 
-    // Track socket metadata
+    if (session.activeKey === deviceKey) {
+      // The active device is back in time; it keeps playing.
+      clearTimeout(session.releaseTimer);
+      session.releaseTimer = null;
+    } else if (session.activeKey === null && session.devices.size === 1) {
+      // Alone and nobody in control: this device plays.
+      session.activeKey = deviceKey;
+    }
+
     socketMeta[socket.id] = { username: key, sessionType: 'private' };
 
-    // Emit devices_update to all user's devices
+    const isActive = isActiveDevice(session, device);
     emitDevicesUpdate(key);
 
-    // If playbackState exists, catch up the new device
-    if (session.playbackState && !isFirstDevice) {
+    // Everyone else mirrors what the active device is doing, without audio.
+    if (session.playbackState && !isActive) {
       socket.emit('sync_playback', session.playbackState);
     }
 
-    console.log(`[Connect] ${username} connected device "${device.name}" (Active: ${isFirstDevice})`);
+    console.log(`[Connect] ${username} connected device "${device.name}" (Active: ${isActive})`);
 
     // ── Private Session Events ──
 
@@ -182,8 +221,8 @@ io.on('connection', (socket) => {
       const privateSession = privateSessions[key];
       if (!privateSession) return;
 
-      const dev = privateSession.devices.get(socket.id);
-      if (dev && dev.isActivePlayer) {
+      const dev = findDeviceBySocket(privateSession, socket.id);
+      if (isActiveDevice(privateSession, dev)) {
         privateSession.playbackState = mergePlaybackState(privateSession.playbackState, data);
         // Broadcast to all OTHER devices of this user
         for (const [sid] of privateSession.devices) {
@@ -194,33 +233,35 @@ io.on('connection', (socket) => {
       }
     });
 
-    socket.on('transfer_playback', ({ targetDeviceId }) => {
+    // Moves audio to one device. A device claiming control for itself can
+    // send its own state (it chose what to play); otherwise the target picks
+    // up where the previous device was.
+    socket.on('transfer_playback', ({ targetDeviceId, state } = {}) => {
       const privateSession = privateSessions[key];
       if (!privateSession) return;
 
-      // Set all devices to inactive
-      for (const [, dev] of privateSession.devices) {
-        dev.isActivePlayer = false;
-      }
-
-      // Set target device to active
       const targetDevice = privateSession.devices.get(targetDeviceId);
-      if (targetDevice) {
-        targetDevice.isActivePlayer = true;
-        // Tell the target device to start playing
-        io.to(targetDeviceId).emit('become_active_player', privateSession.playbackState);
-        // Tell all devices about the device list change
-        emitDevicesUpdate(key);
+      if (!targetDevice) return;
+
+      clearTimeout(privateSession.releaseTimer);
+      privateSession.releaseTimer = null;
+      privateSession.activeKey = targetDevice.key;
+
+      const claimingForSelf = targetDeviceId === socket.id && state;
+      if (claimingForSelf) {
+        privateSession.playbackState = mergePlaybackState(privateSession.playbackState, state);
       }
+      io.to(targetDeviceId).emit('become_active_player', claimingForSelf ? null : privateSession.playbackState);
+      emitDevicesUpdate(key);
     });
 
-    socket.on('remote_command', ({ command, args }) => {
+    socket.on('remote_command', ({ command, args } = {}) => {
       // Forward command to the active player device
       const privateSession = privateSessions[key];
       if (!privateSession) return;
 
       for (const [sid, dev] of privateSession.devices) {
-        if (dev.isActivePlayer && sid !== socket.id) {
+        if (isActiveDevice(privateSession, dev) && sid !== socket.id) {
           io.to(sid).emit('remote_command', { command, args });
         }
       }
@@ -236,22 +277,19 @@ io.on('connection', (socket) => {
 
     socket.on('disconnect', () => {
       const privateSession = privateSessions[key];
-      if (privateSession) {
-        const wasActive = privateSession.devices.get(socket.id)?.isActivePlayer;
+      const leaving = privateSession?.devices.get(socket.id);
+      // Not in the map: this socket was replaced by the same device reconnecting.
+      if (privateSession && leaving) {
         privateSession.devices.delete(socket.id);
 
         if (privateSession.devices.size === 0) {
-          // No devices left, clean up session
+          clearTimeout(privateSession.releaseTimer);
           delete privateSessions[key];
           console.log(`[Connect] Private session ended for user: ${username}`);
         } else {
-          // If the active player disconnected, promote the oldest remaining device
-          if (wasActive) {
-            const firstDevice = privateSession.devices.values().next().value;
-            if (firstDevice) {
-              firstDevice.isActivePlayer = true;
-              io.to(firstDevice.id).emit('become_active_player', privateSession.playbackState);
-            }
+          if (isActiveDevice(privateSession, leaving)) {
+            clearTimeout(privateSession.releaseTimer);
+            privateSession.releaseTimer = setTimeout(() => releaseControl(key, leaving.key), ACTIVE_RELEASE_GRACE_MS);
           }
           emitDevicesUpdate(key);
         }
@@ -377,20 +415,42 @@ io.on('connection', (socket) => {
   }
 });
 
-// Heartbeat cleanup: every 30 seconds, clean up stale devices
+// The active device left and did not come back: stop playback everywhere
+// rather than start audio on some other device.
+function releaseControl(username, deviceKey) {
+  const session = privateSessions[username]
+  if (!session || session.activeKey !== deviceKey) return
+  const stillHere = Array.from(session.devices.values()).some(d => d.key === deviceKey)
+  if (stillHere) return
+
+  session.activeKey = null
+  session.releaseTimer = null
+  if (session.playbackState) {
+    session.playbackState = { ...session.playbackState, isPlaying: false, timestamp: Date.now() }
+    for (const [sid] of session.devices) {
+      io.to(sid).emit('sync_playback', session.playbackState)
+    }
+  }
+  emitDevicesUpdate(username)
+}
+
+// Safety net: drop device entries whose socket is gone without a disconnect
+// event. Sockets that are still connected stay, whatever their heartbeat;
+// Socket.IO's own ping already closes dead ones.
 setInterval(() => {
-  const now = Date.now();
   for (const [username, session] of Object.entries(privateSessions)) {
-    for (const [sid, device] of session.devices) {
-      if (now - device.lastSeen.getTime() > 60000) { // 60s timeout
-        session.devices.delete(sid);
-        delete socketMeta[sid];
+    let changed = false
+    for (const [sid] of session.devices) {
+      if (!io.sockets.sockets.has(sid)) {
+        session.devices.delete(sid)
+        changed = true
       }
     }
     if (session.devices.size === 0) {
-      delete privateSessions[username];
-    } else {
-      emitDevicesUpdate(username);
+      clearTimeout(session.releaseTimer)
+      delete privateSessions[username]
+    } else if (changed) {
+      emitDevicesUpdate(username)
     }
   }
 }, 30000);

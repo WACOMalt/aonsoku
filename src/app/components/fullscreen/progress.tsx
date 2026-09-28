@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react'
 import { ProgressSlider } from '@/app/components/ui/slider'
+import { connectService } from '@/service/connect'
 import {
   usePlayerActions,
   usePlayerDuration,
@@ -23,6 +24,7 @@ export function FullscreenProgress() {
       if (audioPlayerRef) {
         audioPlayerRef.currentTime = value
       }
+      connectService.forwardSeek(value)
     },
     [audioPlayerRef],
   )

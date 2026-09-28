@@ -4,7 +4,7 @@ import { useConnectStore } from '@/store/connect.store'
 import { useJamStore } from '@/store/jam.store'
 import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
-import { getDeviceName } from '@/utils/deviceId'
+import { getDeviceId, getDeviceName } from '@/utils/deviceId'
 import { describeSyncError, getSyncAuth } from '@/utils/syncAuth'
 import { getSyncServerUrl } from '@/utils/syncServerUrl'
 
@@ -14,6 +14,14 @@ class ConnectService {
   private _isSyncing = false
   // See JamService: the queue is only sent when it changes.
   private lastSentQueue: ISong[] | null = null
+  // What the active device last reported, as applied here. On a passive
+  // device, a local change that differs from it is the listener using this
+  // device as a remote.
+  private remoteState: {
+    songId: string
+    isPlaying: boolean
+    queue: ISong[]
+  } | null = null
 
   get isSyncing() {
     return this._isSyncing
@@ -21,7 +29,9 @@ class ConnectService {
 
   connect() {
     const { username } = useAppStore.getState().data
-    if (!username || this.socket?.connected) return
+    // One socket at a time; a second call while connecting (e.g. a double
+    // mount) would otherwise open another.
+    if (!username || this.socket) return
 
     const syncUrl = getSyncServerUrl()
     if (!syncUrl) {
@@ -46,49 +56,70 @@ class ConnectService {
 
     console.log('[Connect] Connecting to sync server at:', syncUrl)
 
-    this.socket = io(syncUrl, {
+    const socket = io(syncUrl, {
       path: '/jam-sync/socket.io',
       // The server verifies `auth` and uses that identity; `username` is only
       // read by sync servers that predate authentication.
       query: {
         username,
         deviceName: getDeviceName(),
+        // Stable across reconnects, so a brief network drop keeps control.
+        deviceKey: getDeviceId(),
         sessionType: 'private',
       },
       auth,
     })
+    this.socket = socket
 
-    this.socket.on('connect', () => {
+    socket.on('connect', () => {
+      // A socket that has since been replaced must not touch state.
+      if (this.socket !== socket) return
       this.lastSentQueue = null
       setConnected(true)
       setConnecting(false)
-      setThisDeviceId(this.socket!.id!)
-      console.log(
-        '[Connect] Connected to sync server, device:',
-        this.socket!.id,
-      )
+      setThisDeviceId(socket.id!)
+      console.log('[Connect] Connected to sync server, device:', socket.id)
 
       // Start heartbeat
       this.startHeartbeat()
     })
 
-    this.socket.on('connect_error', (err) => {
+    socket.on('connect_error', (err) => {
+      // A socket that has since been replaced must not touch state.
+      if (this.socket !== socket) return
       setError(describeSyncError(err.message))
       setConnecting(false)
       console.error('[Connect] Connection error:', err.message)
     })
 
-    this.socket.on('disconnect', () => {
+    socket.on('disconnect', () => {
+      // A socket that has since been replaced must not touch state.
+      if (this.socket !== socket) return
+      // A passive device mirrors "playing" without sound. Once disconnected
+      // it would be free to output audio, so stop it first.
+      if (!useConnectStore.getState().isActivePlayer) {
+        this.withSyncing(() =>
+          usePlayerStore.getState().actions.setPlayingState(false),
+        )
+      }
+      this.remoteState = null
       setConnected(false)
       this.stopHeartbeat()
       console.log('[Connect] Disconnected from sync server')
     })
 
-    this.socket.on('devices_update', (devices) => {
+    socket.on('devices_update', (devices) => {
+      // A socket that has since been replaced must not touch state.
+      if (this.socket !== socket) return
       setDevices(devices)
+      // Just became passive: what is shown now is the baseline that local
+      // changes are compared against, until the active device reports.
+      if (!useConnectStore.getState().isActivePlayer && !this.remoteState) {
+        this.remoteState = this.snapshotLocalState()
+      }
     })
 
-    this.socket.on(
+    socket.on(
       'sync_playback',
       (data: {
         songId: string
@@ -97,6 +128,7 @@ class ConnectService {
         timestamp: number
         queue?: ISong[]
       }) => {
+        if (this.socket !== socket) return
         // Only sync if we're NOT the active player
         const { isActivePlayer } = useConnectStore.getState()
         if (isActivePlayer) return
@@ -105,21 +137,30 @@ class ConnectService {
       },
     )
 
-    this.socket.on('become_active_player', (playbackState) => {
+    socket.on('become_active_player', (playbackState) => {
+      // A socket that has since been replaced must not touch state.
+      if (this.socket !== socket) return
       useConnectStore.getState().actions.setIsActivePlayer(true)
+      this.remoteState = null
       console.log('[Connect] This device is now the active player')
 
       if (playbackState) {
         this.handleRemoteSync(playbackState)
-        // After syncing, start playing
-        const { actions } = usePlayerStore.getState()
-        actions.setPlayingState(playbackState.isPlaying)
+        this.withSyncing(() =>
+          usePlayerStore
+            .getState()
+            .actions.setPlayingState(playbackState.isPlaying),
+        )
       }
+      // Changes made while syncing are not broadcast; announce the state
+      // this device now owns once the flag clears.
+      Promise.resolve().then(() => this.emitPlaybackState())
     })
 
-    this.socket.on(
+    socket.on(
       'remote_command',
       ({ command, args }: { command: string; args?: unknown }) => {
+        if (this.socket !== socket) return
         // Only the active player executes remote commands
         const { isActivePlayer } = useConnectStore.getState()
         if (!isActivePlayer) return
@@ -142,7 +183,10 @@ class ConnectService {
     if (!this.socket?.connected) return
 
     const { isActivePlayer } = useConnectStore.getState()
-    if (!isActivePlayer) return
+    if (!isActivePlayer) {
+      this.forwardLocalChange()
+      return
+    }
 
     const { songlist, playerState, playerProgress } = usePlayerStore.getState()
     const currentSong = songlist.currentSong
@@ -164,6 +208,105 @@ class ConnectService {
   transferPlayback(targetDeviceId: string) {
     if (!this.socket?.connected) return
     this.socket.emit('transfer_playback', { targetDeviceId })
+  }
+
+  /**
+   * Makes this device the one that plays, keeping what it has queued now
+   * (used when the listener starts something here and nothing else is
+   * playing, and when joining a Jam).
+   */
+  claimControl() {
+    if (!this.socket?.connected) return
+    const { isActivePlayer, thisDeviceId } = useConnectStore.getState()
+    if (isActivePlayer || !thisDeviceId) return
+
+    const { songlist, playerState, playerProgress } = usePlayerStore.getState()
+    const song = songlist.currentSong
+    this.socket.emit('transfer_playback', {
+      targetDeviceId: thisDeviceId,
+      state: song
+        ? {
+            songId: song.id,
+            isPlaying: playerState.isPlaying,
+            progress: playerProgress.progress,
+            queue: songlist.currentList,
+            timestamp: Date.now(),
+          }
+        : null,
+    })
+  }
+
+  /**
+   * On a passive device, seeking moves the active device instead.
+   * Returns true when the seek was sent there.
+   */
+  forwardSeek(position: number): boolean {
+    if (!this.socket?.connected) return false
+    if (useConnectStore.getState().isActivePlayer) return false
+    this.sendRemoteCommand('seek', { position })
+    return true
+  }
+
+  /**
+   * The listener changed playback on a passive device (play, pause, a new
+   * song or queue). Ask the active device to do it, or take control when
+   * nothing is playing anywhere.
+   */
+  private forwardLocalChange() {
+    const { songlist, playerState } = usePlayerStore.getState()
+    const song = songlist.currentSong
+    if (!song) return
+
+    const hasActiveDevice = useConnectStore
+      .getState()
+      .devices.some((device) => device.isActivePlayer)
+    const remote = this.remoteState
+
+    if (!hasActiveDevice) {
+      if (playerState.isPlaying) this.claimControl()
+      return
+    }
+    // Nothing reported yet, so no baseline to tell a change from.
+    if (!remote) return
+
+    const songChanged = song.id !== remote.songId
+    const queueChanged = songlist.currentList !== remote.queue
+    const playChanged = playerState.isPlaying !== remote.isPlaying
+    if (!songChanged && !queueChanged && !playChanged) return
+
+    this.remoteState = {
+      songId: song.id,
+      isPlaying: playerState.isPlaying,
+      queue: songlist.currentList,
+    }
+    this.sendRemoteCommand('set_state', {
+      songId: song.id,
+      isPlaying: playerState.isPlaying,
+      ...(queueChanged ? { queue: songlist.currentList } : {}),
+      ...(songChanged ? { progress: 0 } : {}),
+      timestamp: Date.now(),
+    })
+  }
+
+  private snapshotLocalState() {
+    const { songlist, playerState } = usePlayerStore.getState()
+    return {
+      songId: songlist.currentSong?.id ?? '',
+      isPlaying: playerState.isPlaying,
+      queue: songlist.currentList,
+    }
+  }
+
+  /** Runs a player-store change without it being broadcast as our own. */
+  private withSyncing(change: () => void) {
+    this._isSyncing = true
+    try {
+      change()
+    } finally {
+      Promise.resolve().then(() => {
+        this._isSyncing = false
+      })
+    }
   }
 
   sendRemoteCommand(command: string, args?: unknown) {
@@ -194,7 +337,7 @@ class ConnectService {
   private handleRemoteSync(data: {
     songId: string
     isPlaying: boolean
-    progress: number
+    progress?: number
     timestamp: number
     queue?: ISong[]
   }) {
@@ -202,6 +345,7 @@ class ConnectService {
 
     try {
       const { songlist, playerState } = usePlayerStore.getState()
+      const previousSongId = songlist.currentSong?.id
 
       // 1. Sync Queue if provided and different
       if (
@@ -252,18 +396,40 @@ class ConnectService {
         }
       }
 
+      // A new track loads from the stored position, so start it where the
+      // sender is rather than where the previous track was.
+      if (
+        usePlayerStore.getState().songlist.currentSong?.id !== previousSongId
+      ) {
+        usePlayerStore.setState(
+          (state: ReturnType<typeof usePlayerStore.getState>) => {
+            state.playerProgress.progress = data.progress ?? 0
+          },
+        )
+      }
+
       // Sync play/pause
       if (playerState.isPlaying !== data.isPlaying) {
         usePlayerStore.getState().actions.setPlayingState(data.isPlaying)
       }
 
-      // Sync progress (drift correction)
+      // Sync progress (drift correction). A passive device's audio is
+      // silent, so it can follow exactly and its progress bar stays smooth.
       const { syncThreshold } = useJamStore.getState()
+      const isPassive = !useConnectStore.getState().isActivePlayer
       const audio = playerState.audioPlayerRef
-      if (audio) {
+      if (audio && typeof data.progress === 'number') {
         const drift = Math.abs(audio.currentTime - data.progress)
-        if (drift > syncThreshold) {
+        if (drift > (isPassive ? 0.5 : syncThreshold)) {
           audio.currentTime = data.progress
+        }
+      }
+
+      if (isPassive) {
+        this.remoteState = {
+          songId: data.songId,
+          isPlaying: data.isPlaying,
+          queue: usePlayerStore.getState().songlist.currentList,
         }
       }
     } finally {
@@ -290,6 +456,16 @@ class ConnectService {
         break
       case 'previous':
         actions.playPrevSong()
+        break
+      case 'set_state':
+        // A passive device asked for this (see forwardLocalChange). Apply
+        // it, then broadcast so every device, the sender too, follows.
+        if (args && typeof args === 'object' && 'songId' in args) {
+          this.handleRemoteSync(
+            args as Parameters<typeof this.handleRemoteSync>[0],
+          )
+          Promise.resolve().then(() => this.emitPlaybackState())
+        }
         break
       case 'seek':
         if (

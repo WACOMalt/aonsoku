@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { RefObject, useCallback, useEffect, useMemo, useState } from 'react'
 import { ProgressSlider } from '@/app/components/ui/slider'
+import { connectService } from '@/service/connect'
 import { podcasts } from '@/service/podcasts'
 import {
   usePlayerActions,
@@ -35,6 +36,7 @@ export function PlayerProgress({ audioRef }: PlayerProgressProps) {
       if (audioRef.current) {
         audioRef.current.currentTime = value
       }
+      connectService.forwardSeek(value)
     },
     [audioRef],
   )
