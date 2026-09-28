@@ -162,6 +162,11 @@ module.exports = {
       screens: {
         'mid-player': { raw: '(min-height: 133px) and (max-height: 170px)' },
         'mini-player': { raw: '(max-height: 132px)' },
+        // Phones turned sideways: wide enough for the desktop layout but far
+        // too short for it.
+        'landscape-short': {
+          raw: '(orientation: landscape) and (max-height: 500px) and (min-width: 640px)',
+        },
       },
     },
   },
