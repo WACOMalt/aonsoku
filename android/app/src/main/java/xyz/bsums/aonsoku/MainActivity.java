@@ -13,6 +13,13 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(NavigationBarPlugin.class);
         registerPlugin(MediaSessionPlugin.class);
         super.onCreate(savedInstanceState);
+
+        // Gapless playback starts the next track on a second audio element
+        // that the user never tapped. By default the WebView only lets an
+        // element play after a tap on it, which blocks that handoff, most of
+        // all with the screen off. This is a music player the user starts
+        // themselves, so the per-element tap rule only gets in the way.
+        getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
     }
 
     @Override

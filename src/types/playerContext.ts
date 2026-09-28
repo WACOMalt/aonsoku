@@ -101,6 +101,12 @@ interface IFullscreen {
   setAutoFullscreenEnabled: (value: boolean) => void
 }
 
+interface IGapless {
+  /** Load the next track early and start it as the current one ends. */
+  enabled: boolean
+  setEnabled: (value: boolean) => void
+}
+
 interface ILyrics {
   preferSyncedLyrics: boolean
   setPreferSyncedLyrics: (value: boolean) => void
@@ -148,6 +154,7 @@ export interface IPlayerSettings {
   volume: IVolumeSettings
   fullscreen: IFullscreen
   lyrics: ILyrics
+  gapless: IGapless
   replayGain: IReplayGain
   privacy: IPrivacySettings
   colors: IColorsSettings

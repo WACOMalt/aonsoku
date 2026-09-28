@@ -135,6 +135,14 @@ export const usePlayerStore = createWithEqualityFn<IPlayerContext>()(
                 })
               },
             },
+            gapless: {
+              enabled: true,
+              setEnabled: (value) => {
+                set((state) => {
+                  state.settings.gapless.enabled = value
+                })
+              },
+            },
             replayGain: {
               values: {
                 enabled: false,
@@ -1224,6 +1232,9 @@ export const useFullscreenPlayerSettings = () =>
 
 export const useLrcLibSettings = () =>
   usePlayerStore((state) => state.settings.privacy.lrclib)
+
+export const useGaplessSettings = () =>
+  usePlayerStore((state) => state.settings.gapless)
 
 export const useLyricsSettings = () =>
   usePlayerStore((state) => state.settings.lyrics)

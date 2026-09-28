@@ -1,27 +1,21 @@
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
-import { getSongStreamUrl } from '@/api/httpClient'
+import { memo, useCallback, useEffect, useRef } from 'react'
 import { getProxyURL } from '@/api/podcastClient'
 import { MiniPlayerButton } from '@/app/components/mini-player/button'
 import { RadioInfo } from '@/app/components/player/radio-info'
 import { TrackInfo } from '@/app/components/player/track-info'
 import { podcasts } from '@/service/podcasts'
-import { useAppMediaCache, useAppStore } from '@/store/app.store'
+import { useAppStore } from '@/store/app.store'
 import {
   getVolume,
   usePlayerActions,
   usePlayerIsPlaying,
-  usePlayerLoop,
   usePlayerMediaType,
   usePlayerRef,
   usePlayerSonglist,
   usePlayerStore,
-  useReplayGainState,
 } from '@/store/player.store'
-import { LoopState } from '@/types/playerContext'
-import { ensureSupportForAlac } from '@/utils/alac'
 import { hasPiPSupport } from '@/utils/browser'
 import { logger } from '@/utils/logger'
-import { ReplayGainParams } from '@/utils/replayGain'
 import { AudioPlayer } from './audio'
 import { PlayerClearQueueButton } from './clear-queue-button'
 import { ControllerBanner } from './controller-banner'
@@ -36,6 +30,7 @@ import { PodcastInfo } from './podcast-info'
 import { PodcastPlaybackRate } from './podcast-playback-rate'
 import { PlayerProgress } from './progress'
 import { PlayerQueueButton } from './queue-button'
+import { SongAudio } from './song-audio'
 import { PlayerVolume } from './volume'
 
 const MemoTrackInfo = memo(TrackInfo)
@@ -58,7 +53,8 @@ const MemoMobilePlayer = memo(MobilePlayer)
 
 export function Player() {
   const hideFavoritesSection = useAppStore().pages.hideFavoritesSection
-  const audioRef = useRef<HTMLAudioElement>(null)
+  // Points at whichever song element is playing (see SongAudio).
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const radioRef = useRef<HTMLAudioElement>(null)
   const podcastRef = useRef<HTMLAudioElement>(null)
   const {
@@ -74,31 +70,12 @@ export function Player() {
     usePlayerSonglist()
   const isPlaying = usePlayerIsPlaying()
   const { isSong, isRadio, isPodcast } = usePlayerMediaType()
-  const loopState = usePlayerLoop()
   const audioPlayerRef = usePlayerRef()
   const currentPlaybackRate = usePlayerStore().playerState.currentPlaybackRate
-  const { replayGainType, replayGainPreAmp, replayGainDefaultGain } =
-    useReplayGainState()
 
   const song = currentList[currentSongIndex]
   const radio = radioList[currentSongIndex]
   const podcast = podcastList[currentSongIndex]
-
-  const mediaCacheEnabled = useAppMediaCache()
-  const songId = song?.id
-
-  const songStreamUrl = useMemo(() => {
-    if (!songId) return ''
-
-    const cacheBustToken = mediaCacheEnabled ? undefined : Date.now().toString()
-
-    return getSongStreamUrl(
-      songId,
-      undefined,
-      ensureSupportForAlac(song.suffix),
-      cacheBustToken,
-    )
-  }, [songId, song, mediaCacheEnabled])
 
   const getAudioRef = useCallback(() => {
     if (isRadio) return radioRef
@@ -192,32 +169,6 @@ export function Player() {
       })
   }, [isPodcast, podcast])
 
-  const trackReplayGain = useMemo<ReplayGainParams>(() => {
-    const preAmp = replayGainPreAmp
-    const defaultGain = replayGainDefaultGain
-
-    if (!song || !song.replayGain) {
-      return { gain: defaultGain, peak: 1, preAmp }
-    }
-
-    if (replayGainType === 'album') {
-      let { albumGain = defaultGain, albumPeak = 1 } = song.replayGain
-
-      if (albumGain === 0) {
-        albumGain = defaultGain
-      }
-
-      return { gain: albumGain, peak: albumPeak, preAmp }
-    }
-
-    let { trackGain = defaultGain, trackPeak = 1 } = song.replayGain
-
-    if (trackGain === 0) {
-      trackGain = defaultGain
-    }
-    return { gain: trackGain, peak: trackPeak, preAmp }
-  }, [song, replayGainDefaultGain, replayGainPreAmp, replayGainType])
-
   return (
     <>
       {/* On phones the player card says where Connect is playing instead. */}
@@ -282,22 +233,7 @@ export function Player() {
           </div>
         </div>
 
-        {isSong && song && (
-          <AudioPlayer
-            replayGain={trackReplayGain}
-            src={songStreamUrl}
-            autoPlay={isPlaying}
-            audioRef={audioRef}
-            loop={loopState === LoopState.One}
-            onPlay={() => setPlayingState(true)}
-            onPause={() => setPlayingState(false)}
-            onLoadedMetadata={setupDuration}
-            onTimeUpdate={setupProgress}
-            onEnded={handleSongEnded}
-            onLoadStart={setupInitialVolume}
-            data-testid="player-song-audio"
-          />
-        )}
+        {isSong && song && <SongAudio audioRef={audioRef} />}
 
         {isRadio && radio && (
           <AudioPlayer

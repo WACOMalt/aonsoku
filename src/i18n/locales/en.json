@@ -695,6 +695,11 @@
           "label": "Prefer synced lyrics",
           "info": "When enabled, synced lyrics will be prioritized over unsynced lyrics."
         }
+      },
+      "gapless": {
+        "group": "Gapless playback",
+        "description": "Load the next track early and start it right as the current one ends, so albums that flow from one track into the next play without a gap.",
+        "enabled": "Enable gapless playback"
       }
     },
     "privacy": {
