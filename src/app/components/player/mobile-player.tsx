@@ -30,12 +30,14 @@ import { LoopState } from '@/types/playerContext'
 import { getAverageColor, hexToRgb } from '@/utils/getAverageColor'
 import { logger } from '@/utils/logger'
 
-/** The album color, darkened so white text stays readable on it. */
+/**
+ * A hint of the album color mixed into the theme's own surface color, so the
+ * card follows the selected theme (light or dark) and the theme's text color
+ * stays readable on it.
+ */
 function cardBackground(hex: string | null) {
-  const rgb = hex ? hexToRgb(hex) : undefined
-  if (!rgb) return undefined
-  const [r, g, b] = rgb.map((value) => Math.round(value * 0.45))
-  return `rgb(${r}, ${g}, ${b})`
+  if (!hex || !hexToRgb(hex)) return undefined
+  return `color-mix(in srgb, ${hex} 30%, hsl(var(--accent)))`
 }
 
 /**
@@ -124,14 +126,12 @@ export function MobilePlayer() {
           if ((event.target as HTMLElement).closest('button')) return
           if (song) setIsFullscreen(true)
         }}
-        className={clsx(
-          'relative h-full flex items-center gap-2.5 pl-1.5 pr-1 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-colors duration-500',
-          background ? 'text-white' : 'bg-accent text-foreground',
-        )}
+        // bg-accent stays as the fallback where color-mix is unsupported.
+        className="relative h-full flex items-center gap-2.5 pl-1.5 pr-1 rounded-lg overflow-hidden shadow-lg cursor-pointer transition-colors duration-500 bg-accent text-foreground"
         style={background ? { backgroundColor: background } : undefined}
         data-testid="mobile-player"
       >
-        <div className="size-10 rounded overflow-hidden shrink-0 bg-black/20 flex items-center justify-center">
+        <div className="size-10 rounded overflow-hidden shrink-0 bg-foreground/10 flex items-center justify-center">
           {song ? (
             <ImageLoader id={song.coverArt} type="song" size={120}>
               {(src) => (
@@ -170,12 +170,7 @@ export function MobilePlayer() {
                   {t('player.playingOn', { device: playingOn })}
                 </p>
               ) : (
-                <p
-                  className={clsx(
-                    'text-xs truncate mt-0.5',
-                    background ? 'text-white/70' : 'text-muted-foreground',
-                  )}
-                >
+                <p className="text-xs truncate mt-0.5 text-foreground/70">
                   {subtitle}
                 </p>
               )}
@@ -219,9 +214,9 @@ export function MobilePlayer() {
         </button>
 
         {(song || podcast) && (
-          <div className="absolute left-2 right-2 bottom-0 h-[2px] rounded-full bg-white/20 overflow-hidden">
+          <div className="absolute left-2 right-2 bottom-0 h-[2px] rounded-full bg-foreground/20 overflow-hidden">
             <div
-              className="h-full bg-white transition-[width] duration-300"
+              className="h-full bg-foreground transition-[width] duration-300"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
