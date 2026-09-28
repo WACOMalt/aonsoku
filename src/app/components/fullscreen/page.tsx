@@ -39,7 +39,8 @@ export function FullscreenMode() {
       <DrawerTitle className="sr-only">Big Player</DrawerTitle>
       <DrawerContent
         onAnimationEnd={handleDrawerAnimationEnd}
-        className="h-dvh w-screen rounded-t-none border-none select-none cursor-default mt-0"
+        // Above the phone tab bar (z-45), which otherwise covers its controls.
+        className="h-dvh w-screen rounded-t-none border-none select-none cursor-default mt-0 z-50"
         showHandle={false}
         aria-describedby={undefined}
       >
