@@ -27,7 +27,16 @@ import { calculateReplayGain, replayGainParamsFor } from '@/utils/replayGain'
 import { getNextSong } from './song-audio'
 
 /** An item the native player holds. */
-type Entry = { key: string; songId: string }
+type Entry = { key: string; songId: string; item: NativeItem }
+
+/** The tracks the native player holds: the current one and its neighbours. */
+type Held = {
+  previous: Entry | null
+  current: Entry | null
+  next: Entry | null
+}
+
+const NOTHING_HELD: Held = { previous: null, current: null, next: null }
 
 /** The last position the native player reported, to extrapolate from. */
 type Clock = {
@@ -51,9 +60,11 @@ interface NativeSongAudioProps {
 
 /**
  * Song playback in the Android app, through the native player. It holds the
- * current track and preloads the next, joining them without a gap even with
- * the screen off; the queue stays here, and each time the native player
- * moves on, the next track is sent.
+ * current track and its neighbours, preloads the next and joins onto it
+ * without a gap, even with the screen off. The queue stays here: whenever
+ * the native player moves (by itself, or from the notification or a
+ * headset, which it handles without waiting for this page), the queue
+ * follows and the new neighbours are sent.
  */
 export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
   const { t } = useTranslation()
@@ -81,11 +92,10 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
 
   const song = currentList[currentSongIndex] as ISong | undefined
   const nextSong = getNextSong(currentList, currentSongIndex, loopState)
+  const prevSong =
+    currentSongIndex > 0 ? currentList[currentSongIndex - 1] : undefined
 
-  const held = useRef<{ current: Entry | null; next: Entry | null }>({
-    current: null,
-    next: null,
-  })
+  const held = useRef<Held>(NOTHING_HELD)
   const clock = useRef<Clock>({
     key: '',
     positionMs: 0,
@@ -96,13 +106,13 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
   const seekGuard = useRef({ until: 0, targetMs: 0 })
 
   // Latest values for the one-time listeners and the load effect.
-  const live = useRef({ isPlaying, loopState, song, nextSong })
-  live.current = { isPlaying, loopState, song, nextSong }
+  const live = useRef({ isPlaying, loopState, song, nextSong, prevSong })
+  live.current = { isPlaying, loopState, song, nextSong, prevSong }
 
   const shim = useMemo(() => createElementShim(clock, seekGuard), [])
 
-  const makeItem = useCallback(
-    (track: ISong): NativeItem => {
+  const makeEntry = useCallback(
+    (track: ISong): Entry => {
       const gain =
         replayGainEnabled && !replayGainError
           ? calculateReplayGain(
@@ -113,8 +123,9 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
               }),
             )
           : 1
-      return {
-        key: `${track.id}#${++keyCounter}`,
+      const key = `${track.id}#${++keyCounter}`
+      const item: NativeItem = {
+        key,
         url: getSongStreamUrl(
           track.id,
           undefined,
@@ -130,6 +141,7 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
         durationMs: (track.duration ?? 0) * 1000,
         gain: Number.isFinite(gain) && gain > 0 ? gain : 1,
       }
+      return { key, songId: track.id, item }
     },
     [
       mediaCacheEnabled,
@@ -161,7 +173,7 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
         setAudioPlayerRef(null as unknown as HTMLAudioElement)
       }
       // Loaded again from scratch if this mounts again.
-      held.current = { current: null, next: null }
+      held.current = NOTHING_HELD
       NativePlayer?.stop()
     }
   }, [audioRef, setAudioPlayerRef, shim])
@@ -194,16 +206,22 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
         }
       }),
 
-      // The native player moved on to the preloaded track by itself; follow
-      // it in the queue. (A skip here has already moved the queue.)
+      // The native player moved to a neighbour by itself (the end of a
+      // track, or the notification or a headset); follow it in the queue.
+      // A skip made here has already moved the queue.
       NativePlayer.addListener('transition', ({ key }) => {
-        const { next } = held.current
-        if (!next || next.key !== key) return
-        held.current = { current: next, next: null }
-        restartClock(key, 0)
+        const { previous, current, next } = held.current
         const { currentList: list, currentSongIndex: at } =
           usePlayerStore.getState().songlist
-        if (list[at]?.id !== next.songId) playNextSong()
+        if (next?.key === key) {
+          held.current = { previous: current, current: next, next: null }
+          restartClock(key, 0)
+          if (list[at]?.id !== next.songId) playNextSong()
+        } else if (previous?.key === key) {
+          held.current = { previous: null, current: previous, next: current }
+          restartClock(key, 0)
+          if (list[at]?.id !== previous.songId) playPrevSong()
+        }
       }),
 
       // Played or paused from the notification, a headset, or because
@@ -216,7 +234,7 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
 
       NativePlayer.addListener('ended', ({ key }) => {
         if (key && key !== held.current.current?.key) return
-        held.current = { current: null, next: null }
+        held.current = NOTHING_HELD
         const endedId = live.current.song?.id
         handleSongEnded()
         // Repeating a one-track queue comes back to the same track, which
@@ -233,7 +251,7 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
         logger.error('Native playback error', data)
         toast.error(t('warnings.songError'))
         // Loading the track again (play, or picking it) retries it.
-        held.current = { current: null, next: null }
+        held.current = NOTHING_HELD
         setPlayingState(false)
       }),
 
@@ -249,36 +267,34 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
 
   // Starts the current track from the queue's position.
   const loadCurrent = useCallback(() => {
-    const { song: track, nextSong: following } = live.current
+    const { song: track, nextSong: following, prevSong: before } = live.current
     if (!track || !NativePlayer) return
 
-    const item = makeItem(track)
-    const nextItem = following ? makeItem(following) : undefined
     held.current = {
-      current: { key: item.key, songId: track.id },
-      next:
-        nextItem && following
-          ? { key: nextItem.key, songId: following.id }
-          : null,
+      previous: before ? makeEntry(before) : null,
+      current: makeEntry(track),
+      next: following ? makeEntry(following) : null,
     }
+    const { previous, current, next } = held.current
     // Resume where the track was (after a reload, or a synced position).
     const positionMs = getCurrentProgress() * 1000
-    restartClock(item.key, positionMs)
+    restartClock(current!.key, positionMs)
     setCurrentDuration(track.duration)
     NativePlayer.load({
-      current: item,
-      next: nextItem,
+      previous: previous?.item,
+      current: current!.item,
+      next: next?.item,
       positionMs,
       playWhenReady: live.current.isPlaying,
       repeatOne: live.current.loopState === LoopState.One,
       volume: getVolume() / 100,
     })
-  }, [getCurrentProgress, makeItem, restartClock, setCurrentDuration])
+  }, [getCurrentProgress, makeEntry, restartClock, setCurrentDuration])
   const loadRef = useRef(loadCurrent)
   loadRef.current = loadCurrent
 
-  // The current track changed: move on to the preloaded track when it is
-  // the one, otherwise load it.
+  // The current track changed: move to a neighbour the native player
+  // already holds when it is the one, otherwise load it.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the track
   useEffect(() => {
     if (!song || !NativePlayer) return
@@ -286,38 +302,52 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
       setAudioPlayerRef(shim)
     }
 
-    const { current, next } = held.current
+    const { previous, current, next } = held.current
     if (current?.songId === song.id) return
 
+    let target: Entry
     if (next?.songId === song.id) {
-      held.current = { current: next, next: null }
-      restartClock(next.key, 0)
-      setCurrentDuration(song.duration)
-      NativePlayer.skipToNext({ key: next.key }).then(({ skipped }) => {
-        if (!skipped) logger.warn('Native player skip missed', next.key)
-      })
+      target = next
+      held.current = { previous: current, current: next, next: null }
+    } else if (previous?.songId === song.id) {
+      target = previous
+      held.current = { previous: null, current: previous, next: current }
+    } else {
+      loadCurrent()
       return
     }
 
-    loadCurrent()
+    restartClock(target.key, 0)
+    setCurrentDuration(song.duration)
+    NativePlayer.skipTo({ key: target.key }).then(({ skipped }) => {
+      if (!skipped) logger.warn('Native player skip missed', target.key)
+    })
   }, [song?.id])
 
-  // Keep the track after the current one preloaded.
+  // Keep the neighbours of the current track loaded: the next one preloads
+  // for a gapless join, and both let the notification and headset buttons
+  // move without this page.
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the tracks
   useEffect(() => {
     if (!song || !NativePlayer) return
-    const { current, next } = held.current
+    const { previous, current, next } = held.current
     // The current track is still being loaded.
     if (current?.songId !== song.id) return
-    if ((next?.songId ?? null) === (nextSong?.id ?? null)) return
 
-    const item = nextSong ? makeItem(nextSong) : undefined
+    const samePrevious = (previous?.songId ?? null) === (prevSong?.id ?? null)
+    const sameNext = (next?.songId ?? null) === (nextSong?.id ?? null)
+    if (samePrevious && sameNext) return
+
     held.current = {
+      previous: samePrevious ? previous : prevSong ? makeEntry(prevSong) : null,
       current,
-      next: item ? { key: item.key, songId: nextSong!.id } : null,
+      next: sameNext ? next : nextSong ? makeEntry(nextSong) : null,
     }
-    NativePlayer.setNext({ next: item })
-  }, [song?.id, nextSong?.id])
+    NativePlayer.setAdjacent({
+      previous: held.current.previous?.item,
+      next: held.current.next?.item,
+    })
+  }, [song?.id, prevSong?.id, nextSong?.id])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on play state
   useEffect(() => {

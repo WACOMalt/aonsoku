@@ -30,6 +30,7 @@ export interface NativeProgress {
 
 interface NativePlayerPlugin {
   load(options: {
+    previous?: NativeItem
     current: NativeItem
     next?: NativeItem
     positionMs: number
@@ -37,8 +38,11 @@ interface NativePlayerPlugin {
     repeatOne: boolean
     volume: number
   }): Promise<void>
-  setNext(options: { next?: NativeItem }): Promise<void>
-  skipToNext(options: { key: string }): Promise<{ skipped: boolean }>
+  setAdjacent(options: {
+    previous?: NativeItem
+    next?: NativeItem
+  }): Promise<void>
+  skipTo(options: { key: string }): Promise<{ skipped: boolean }>
   setPlaying(options: { playing: boolean }): Promise<void>
   seekTo(options: { positionMs: number }): Promise<void>
   setVolume(options: { volume: number }): Promise<void>

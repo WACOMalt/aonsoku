@@ -18,9 +18,9 @@ import androidx.media3.session.MediaSessionService;
  * session: the notification, lock screen controls, headset and car buttons.
  * The player itself is PlaybackEngine's.
  *
- * The player only ever holds the current track and the one after it (the web
- * app owns the queue), so next and previous are handed to the web app rather
- * than applied to that short playlist.
+ * The player only holds the tracks around the current one (the web app owns
+ * the queue), so next and previous move within those and fall back to the
+ * web app beyond them.
  */
 public class PlaybackService extends MediaSessionService {
 
@@ -74,7 +74,7 @@ public class PlaybackService extends MediaSessionService {
         super.onDestroy();
     }
 
-    /** Offers next/previous everywhere and passes them to the web app. */
+    /** Offers next/previous everywhere, handled by PlaybackEngine. */
     private static final class QueuePlayer extends ForwardingPlayer {
 
         QueuePlayer(Player player) {
@@ -83,22 +83,22 @@ public class PlaybackService extends MediaSessionService {
 
         @Override
         public void seekToNext() {
-            PlaybackEngine.sendCommand("nexttrack");
+            PlaybackEngine.skipToNext(getWrappedPlayer());
         }
 
         @Override
         public void seekToNextMediaItem() {
-            PlaybackEngine.sendCommand("nexttrack");
+            PlaybackEngine.skipToNext(getWrappedPlayer());
         }
 
         @Override
         public void seekToPrevious() {
-            PlaybackEngine.sendCommand("previoustrack");
+            PlaybackEngine.skipToPrevious(getWrappedPlayer());
         }
 
         @Override
         public void seekToPreviousMediaItem() {
-            PlaybackEngine.sendCommand("previoustrack");
+            PlaybackEngine.skipToPrevious(getWrappedPlayer());
         }
 
         @Override

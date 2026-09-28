@@ -5,6 +5,7 @@ import android.content.Context;
 import androidx.annotation.OptIn;
 import androidx.media3.common.AudioAttributes;
 import androidx.media3.common.C;
+import androidx.media3.common.Player;
 import androidx.media3.common.util.UnstableApi;
 import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.DefaultHttpDataSource;
@@ -75,5 +76,31 @@ final class PlaybackEngine {
     static void sendCommand(String action) {
         CommandListener listener = commandListener;
         if (listener != null) listener.onCommand(action);
+    }
+
+    /**
+     * Next from the notification, lock screen or a headset. Handled here when
+     * the next track is loaded, so it works even while the web app is asleep
+     * in the background; the web app follows when it is told of the change.
+     */
+    static void skipToNext(Player player) {
+        int index = player.getCurrentMediaItemIndex();
+        if (index + 1 < player.getMediaItemCount()) {
+            player.seekTo(index + 1, 0);
+            if (player.getPlaybackState() == Player.STATE_IDLE) player.prepare();
+        } else {
+            sendCommand("nexttrack");
+        }
+    }
+
+    /** Previous, handled the same way as next. */
+    static void skipToPrevious(Player player) {
+        int index = player.getCurrentMediaItemIndex();
+        if (index >= 1) {
+            player.seekTo(index - 1, 0);
+            if (player.getPlaybackState() == Player.STATE_IDLE) player.prepare();
+        } else {
+            sendCommand("previoustrack");
+        }
     }
 }

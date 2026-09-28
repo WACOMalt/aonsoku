@@ -32,11 +32,13 @@ import java.util.List;
 /**
  * Lets the web app play songs through ExoPlayer (see PlaybackEngine).
  *
- * The web app keeps the queue. The player holds the current track plus the
- * one after it, which it preloads and joins onto without a gap; when it moves
- * on by itself the web app is told, advances its queue and sends the track
- * after that. Every item carries a key from the web app so events can be
- * matched to the item they are about.
+ * The web app keeps the queue. The player holds the current track with the
+ * one before and the one after it: it preloads the next and joins onto it
+ * without a gap, and the notification and headset buttons can move to
+ * either without waiting for the web app, which may be asleep in the
+ * background. Whenever the player moves, the web app is told, moves its
+ * queue to match and sends the new neighbours. Every item carries a key from
+ * the web app so events can be matched to the item they are about.
  *
  * Events: "progress" (position), "transition" (a new item started),
  * "playing" (play/pause from outside the app: notification, headset, another
@@ -78,11 +80,11 @@ public class NativePlayerPlugin extends Plugin {
             data.put("key", item.mediaId);
             data.put("reason", reason);
             notifyListeners("transition", data);
-            // Only the current item and the one after it are kept.
+            // Keep one item before the current one, for previous.
             main.post(() -> {
                 if (player == null) return;
                 int index = player.getCurrentMediaItemIndex();
-                if (index > 0) player.removeMediaItems(0, index);
+                if (index > 1) player.removeMediaItems(0, index - 1);
             });
             emitProgress();
         }
@@ -166,9 +168,9 @@ public class NativePlayerPlugin extends Plugin {
     }
 
     /**
-     * Starts a track: { current, next?, positionMs, playWhenReady, repeatOne,
-     * volume }. Items are { key, url, title, artist, album, artworkUrl,
-     * durationMs, gain }.
+     * Starts a track: { previous?, current, next?, positionMs, playWhenReady,
+     * repeatOne, volume }. Items are { key, url, title, artist, album,
+     * artworkUrl, durationMs, gain }.
      */
     @PluginMethod
     public void load(PluginCall call) {
@@ -177,6 +179,7 @@ public class NativePlayerPlugin extends Plugin {
             call.reject("current is required");
             return;
         }
+        JSObject previous = call.getObject("previous");
         JSObject next = call.getObject("next");
         long positionMs = Math.max(0, call.getDouble("positionMs", 0.0).longValue());
         boolean playWhenReady = Boolean.TRUE.equals(call.getBoolean("playWhenReady", false));
@@ -186,12 +189,13 @@ public class NativePlayerPlugin extends Plugin {
         main.post(() -> {
             ExoPlayer p = ensurePlayer();
             List<MediaItem> items = new ArrayList<>();
+            if (previous != null) items.add(toMediaItem(previous));
             items.add(toMediaItem(current));
             if (next != null) items.add(toMediaItem(next));
             volume = newVolume;
             requestedPlaying = playWhenReady;
             p.setRepeatMode(repeatOne ? Player.REPEAT_MODE_ONE : Player.REPEAT_MODE_OFF);
-            p.setMediaItems(items, 0, positionMs);
+            p.setMediaItems(items, previous != null ? 1 : 0, positionMs);
             applyVolume();
             p.prepare();
             p.setPlayWhenReady(playWhenReady);
@@ -199,9 +203,14 @@ public class NativePlayerPlugin extends Plugin {
         });
     }
 
-    /** Replaces whatever follows the current track: { next? }. */
+    /**
+     * Sets the tracks either side of the current one: { previous?, next? }.
+     * A side whose key is already in place is left alone, so a preloaded
+     * next track keeps its buffered audio.
+     */
     @PluginMethod
-    public void setNext(PluginCall call) {
+    public void setAdjacent(PluginCall call) {
+        JSObject previous = call.getObject("previous");
         JSObject next = call.getObject("next");
         main.post(() -> {
             if (player == null || player.getMediaItemCount() == 0) {
@@ -210,23 +219,32 @@ public class NativePlayerPlugin extends Plugin {
             }
             int index = player.getCurrentMediaItemIndex();
             int count = player.getMediaItemCount();
-            if (next != null && count == index + 2
+            if (next != null && index + 1 < count
                 && player.getMediaItemAt(index + 1).mediaId.equals(next.getString("key"))) {
-                call.resolve();
-                return;
+                if (count > index + 2) player.removeMediaItems(index + 2, count);
+            } else {
+                if (count > index + 1) player.removeMediaItems(index + 1, count);
+                if (next != null) player.addMediaItem(toMediaItem(next));
             }
-            if (count > index + 1) player.removeMediaItems(index + 1, count);
-            if (next != null) player.addMediaItem(toMediaItem(next));
+
+            index = player.getCurrentMediaItemIndex();
+            if (previous != null && index >= 1
+                && player.getMediaItemAt(index - 1).mediaId.equals(previous.getString("key"))) {
+                if (index > 1) player.removeMediaItems(0, index - 1);
+            } else {
+                if (index > 0) player.removeMediaItems(0, index);
+                if (previous != null) player.addMediaItem(0, toMediaItem(previous));
+            }
             call.resolve();
         });
     }
 
     /**
-     * Moves on to the preloaded next track: { key }. Does nothing if that
-     * track is already playing, or is not the one preloaded.
+     * Moves to the item next to the current one with this key: { key }. Does
+     * nothing if it is already playing, or is not next to it.
      */
     @PluginMethod
-    public void skipToNext(PluginCall call) {
+    public void skipTo(PluginCall call) {
         String key = call.getString("key", "");
         main.post(() -> {
             JSObject result = new JSObject();
@@ -235,11 +253,16 @@ public class NativePlayerPlugin extends Plugin {
                 int index = player.getCurrentMediaItemIndex();
                 if (key.equals(currentKey())) {
                     skipped = true;
-                } else if (index + 1 < player.getMediaItemCount()
-                    && player.getMediaItemAt(index + 1).mediaId.equals(key)) {
-                    player.seekTo(index + 1, 0);
-                    if (player.getPlaybackState() == Player.STATE_IDLE) player.prepare();
-                    skipped = true;
+                } else {
+                    for (int target : new int[] { index + 1, index - 1 }) {
+                        if (target >= 0 && target < player.getMediaItemCount()
+                            && player.getMediaItemAt(target).mediaId.equals(key)) {
+                            player.seekTo(target, 0);
+                            if (player.getPlaybackState() == Player.STATE_IDLE) player.prepare();
+                            skipped = true;
+                            break;
+                        }
+                    }
                 }
             }
             result.put("skipped", skipped);
