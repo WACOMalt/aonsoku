@@ -18,7 +18,6 @@ import {
   usePlayerActions,
   usePlayerIsPlaying,
   usePlayerMediaType,
-  usePlayerVolume,
   useReplayGainActions,
   useReplayGainState,
 } from '@/store/player.store'
@@ -49,12 +48,13 @@ export function AudioPlayer({
   ...props
 }: AudioPlayerProps) {
   const { t } = useTranslation()
-  const [previousGain, setPreviousGain] = useState(1)
+  // NaN so the first pass always routes the element through the shared
+  // audio context (gapless crossfades need it), even at a gain of 1.
+  const [previousGain, setPreviousGain] = useState(Number.NaN)
   const { replayGainEnabled, replayGainError } = useReplayGainState()
   const { isSong, isRadio, isPodcast } = usePlayerMediaType()
   const { setPlayingState } = usePlayerActions()
   const { setReplayGainEnabled, setReplayGainError } = useReplayGainActions()
-  const { volume } = usePlayerVolume()
   const isPlaying = usePlayerIsPlaying()
   // Only one of the listener's devices plays audio (Connect). On the others
   // "playing" mirrors that device, so it must never start this element.
@@ -65,18 +65,14 @@ export function AudioPlayer({
   const onPlayBlockedRef = useRef(onPlayBlocked)
   onPlayBlockedRef.current = onPlayBlocked
 
+  // Only the ReplayGain factor: the element's own volume already applies the
+  // player volume, and multiplying it in here as well squared it.
   const gainValue = useMemo(() => {
-    const audioVolume = volume / 100
+    if (!replayGain || !replayGainEnabled) return 1
+    return calculateReplayGain(replayGain)
+  }, [replayGain, replayGainEnabled])
 
-    if (!replayGain || !replayGainEnabled) {
-      return audioVolume * 1
-    }
-    const gain = calculateReplayGain(replayGain)
-
-    return audioVolume * gain
-  }, [replayGain, replayGainEnabled, volume])
-
-  const { resumeContext, setupGain } = useAudioContext(audioRef.current)
+  const { resumeContext, setupGain } = useAudioContext(audioRef)
 
   const ignoreGain = !isSong || replayGainError
 

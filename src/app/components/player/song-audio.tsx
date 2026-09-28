@@ -8,6 +8,10 @@ import {
   useState,
 } from 'react'
 import { getSongStreamUrl } from '@/api/httpClient'
+import {
+  crossfadeElements,
+  resetElementFade,
+} from '@/app/hooks/use-audio-context'
 import { useAppMediaCache } from '@/store/app.store'
 import { isPassiveConnectDevice } from '@/store/connect.store'
 import {
@@ -28,19 +32,64 @@ import { AudioPlayer } from './audio'
 
 /**
  * How long before a track ends the next one is started, to cover the time
- * the next element takes to actually start. That delay differs between
- * devices (a desktop browser is much quicker than an Android WebView), so
- * the lead calibrates itself after each handoff toward a tiny overlap.
+ * the next element takes to actually produce sound. That delay differs by
+ * device, so the lead calibrates itself: after each handoff the real gap is
+ * measured from the two elements' own playback clocks (which follow their
+ * audio output, unlike the "playing" event) and the lead is corrected. The
+ * result is remembered on the device.
  */
-const TARGET_OVERLAP_SECONDS = 0.01
-const MAX_LEAD_SECONDS = 0.25
-let handoffLead = 0.05
+/**
+ * Two separate elements can only be lined up to within a few milliseconds
+ * (in Chromium the next one starts on ~21 ms steps), so the handoff aims for
+ * a small overlap and crossfades across it: a hard cut would click, and a
+ * gap would be audible on albums that run continuously.
+ */
+const CROSSFADE_SECONDS = 0.025
+const TARGET_OVERLAP_SECONDS = 0.012
 
-function adjustLead(error: number) {
+const LEAD_STORAGE_KEY = 'aonsoku-gapless-lead'
+const DEFAULT_LEAD_SECONDS = 0.035
+const MAX_LEAD_SECONDS = 0.5
+let handoffLead = readStoredLead()
+
+function readStoredLead() {
+  try {
+    const stored = Number(localStorage.getItem(LEAD_STORAGE_KEY))
+    if (stored > 0 && stored <= MAX_LEAD_SECONDS) return stored
+  } catch {
+    // Storage unavailable; use the default.
+  }
+  return DEFAULT_LEAD_SECONDS
+}
+
+/** Positive: the join had a gap of that many seconds; negative: overlap. */
+function correctLead(gapSeconds: number) {
   handoffLead = Math.min(
     MAX_LEAD_SECONDS,
-    Math.max(0, handoffLead + error * 0.5),
+    Math.max(0, handoffLead + gapSeconds * 0.8),
   )
+  try {
+    localStorage.setItem(LEAD_STORAGE_KEY, handoffLead.toFixed(4))
+  } catch {
+    // Not remembered; it recalibrates next session.
+  }
+}
+
+/**
+ * When, on the page clock, the element played position 0: its playback
+ * clock follows the audio output, so this is when its sound started.
+ * Averaged over a few readings; null when playback was interrupted.
+ */
+async function measureStart(element: HTMLAudioElement) {
+  const starts: number[] = []
+  for (let reading = 0; reading < 5; reading++) {
+    if (element.paused || element.seeking) return null
+    const rate = element.playbackRate || 1
+    starts.push(performance.now() - (element.currentTime / rate) * 1000)
+    await new Promise((resolve) => setTimeout(resolve, 40))
+  }
+  if (Math.max(...starts) - Math.min(...starts) > 20) return null
+  return starts.reduce((sum, start) => sum + start, 0) / starts.length
 }
 
 /** Only start early when the stream length agrees with the track's. */
@@ -87,10 +136,9 @@ export function SongAudio({ audioRef }: SongAudioProps) {
   const [slots, setSlots] = useState<[Slot | null, Slot | null]>([null, null])
   const [active, setActive] = useState<SlotIndex>(0)
   const handoffTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // The slot a handoff just left, and when each slot last ended, to measure
-  // how well the handoff lined up.
-  const handoffFrom = useRef<SlotIndex | null>(null)
-  const endedAt = useRef<[number, number]>([0, 0])
+  // A handoff in progress: when the old track ends (page clock) and the
+  // slot taking over, to measure how well the two lined up.
+  const handoff = useRef<{ oldEnd: number; to: SlotIndex } | null>(null)
 
   // Set when the browser refuses to start the standby element; from then
   // on this session plays everything on the one element it allows.
@@ -152,8 +200,12 @@ export function SongAudio({ audioRef }: SongAudioProps) {
     if (currentSlots[standby]?.song.id === song.id) {
       const element = slotRefs[standby].current
       if (element) {
+        // A handoff has its crossfade scheduled; anything else plays at once.
+        if (handoff.current?.to !== standby) resetElementFade(element)
         // A skip (not a handoff) starts the preloaded track from the top.
-        if (element.paused) element.currentTime = 0
+        // Only seek when needed: a seek flushes the decoder, which delays
+        // the start and so adds a gap at a handoff.
+        if (element.paused && element.currentTime > 0) element.currentTime = 0
         element.volume = getVolume() / 100
         setCurrentDuration(
           Number.isFinite(element.duration)
@@ -166,6 +218,8 @@ export function SongAudio({ audioRef }: SongAudioProps) {
       return
     }
 
+    const element = slotRefs[current].current
+    if (element) resetElementFade(element)
     setSlots((previous) => {
       const updated: [Slot | null, Slot | null] = [...previous]
       updated[current] = makeSlot(song)
@@ -271,7 +325,16 @@ export function SongAudio({ audioRef }: SongAudioProps) {
         if (element.paused || element.duration - element.currentTime > 0.5) {
           return
         }
-        handoffFrom.current = index
+        const rate = element.playbackRate || 1
+        const left = (element.duration - element.currentTime) / rate
+        handoff.current = {
+          oldEnd: performance.now() + left * 1000,
+          to: other(index),
+        }
+        const nextElement = slotRefs[other(index)].current
+        if (nextElement) {
+          crossfadeElements(element, nextElement, left, CROSSFADE_SECONDS)
+        }
         state.actions.playNextSong()
       },
       Math.max(0, (remaining - handoffLead) * 1000),
@@ -283,22 +346,20 @@ export function SongAudio({ audioRef }: SongAudioProps) {
   // old track play out rather than cutting them.
   function handlePlaying(index: SlotIndex) {
     if (!isActive(index)) return
-    const previousIndex = other(index)
-    const previous = slotRefs[previousIndex].current
+    const previous = slotRefs[other(index)].current
+    const element = slotRefs[index].current
 
-    if (handoffFrom.current === previousIndex && previous) {
-      handoffFrom.current = null
-      if (previous.ended) {
-        // Started after the old track had already ended: start earlier. The
-        // "ended" event can arrive late (about 80 ms in an Android WebView),
-        // so one measurement only moves the lead a little.
-        const gap = (performance.now() - endedAt.current[previousIndex]) / 1000
-        if (gap < 1) adjustLead(Math.min(gap, 0.05) + TARGET_OVERLAP_SECONDS)
-      } else {
-        // Started while the old one still had this much left.
-        const overlap = previous.duration - previous.currentTime
-        adjustLead(-(overlap - TARGET_OVERLAP_SECONDS))
-      }
+    if (handoff.current?.to === index && element) {
+      const { oldEnd } = handoff.current
+      handoff.current = null
+      // Measure once playback has settled, then correct the lead.
+      setTimeout(async () => {
+        const newStart = await measureStart(element)
+        if (newStart === null) return
+        const gap = (newStart - oldEnd) / 1000
+        // Larger means a pause, seek or stall got in the way.
+        if (Math.abs(gap) < 0.4) correctLead(gap + TARGET_OVERLAP_SECONDS)
+      }, 800)
     }
 
     if (!previous || previous.paused) return
@@ -368,9 +429,6 @@ export function SongAudio({ audioRef }: SongAudioProps) {
             onPlayBlocked={
               standbyBlocked ? undefined : () => handlePlayBlocked(index)
             }
-            onEndedCapture={() => {
-              endedAt.current[index] = performance.now()
-            }}
             onLoadedMetadata={(event: SyntheticEvent<HTMLAudioElement>) =>
               handleLoadedMetadata(index, event.currentTarget)
             }
