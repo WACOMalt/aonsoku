@@ -27,7 +27,7 @@ import {
 import { LoopState } from '@/types/playerContext'
 import { ISong } from '@/types/responses/song'
 import { ensureSupportForAlac } from '@/utils/alac'
-import { ReplayGainParams } from '@/utils/replayGain'
+import { ReplayGainParams, replayGainParamsFor } from '@/utils/replayGain'
 import { AudioPlayer } from './audio'
 
 /**
@@ -384,25 +384,11 @@ export function SongAudio({ audioRef }: SongAudioProps) {
   }
 
   function replayGainFor(track: ISong): ReplayGainParams {
-    const preAmp = replayGainPreAmp
-    const defaultGain = replayGainDefaultGain
-    if (!track.replayGain) return { gain: defaultGain, peak: 1, preAmp }
-
-    if (replayGainType === 'album') {
-      const { albumGain = defaultGain, albumPeak = 1 } = track.replayGain
-      return {
-        gain: albumGain === 0 ? defaultGain : albumGain,
-        peak: albumPeak,
-        preAmp,
-      }
-    }
-
-    const { trackGain = defaultGain, trackPeak = 1 } = track.replayGain
-    return {
-      gain: trackGain === 0 ? defaultGain : trackGain,
-      peak: trackPeak,
-      preAmp,
-    }
+    return replayGainParamsFor(track, {
+      type: replayGainType,
+      preAmp: replayGainPreAmp,
+      defaultGain: replayGainDefaultGain,
+    })
   }
 
   return (
@@ -449,7 +435,7 @@ export function SongAudio({ audioRef }: SongAudioProps) {
 }
 
 /** The track that plays after the current one, if any. */
-function getNextSong(
+export function getNextSong(
   list: ISong[],
   index: number,
   loopState: LoopState,

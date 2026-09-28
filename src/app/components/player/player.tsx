@@ -5,8 +5,10 @@ import { RadioInfo } from '@/app/components/player/radio-info'
 import { TrackInfo } from '@/app/components/player/track-info'
 import { podcasts } from '@/service/podcasts'
 import { useAppStore } from '@/store/app.store'
+import { useCanOutputAudio } from '@/store/connect.store'
 import {
   getVolume,
+  useGaplessSettings,
   usePlayerActions,
   usePlayerIsPlaying,
   usePlayerMediaType,
@@ -16,6 +18,7 @@ import {
 } from '@/store/player.store'
 import { hasPiPSupport } from '@/utils/browser'
 import { logger } from '@/utils/logger'
+import { usesNativeSongPlayer } from '@/utils/nativePlayer'
 import { AudioPlayer } from './audio'
 import { PlayerClearQueueButton } from './clear-queue-button'
 import { ControllerBanner } from './controller-banner'
@@ -26,6 +29,7 @@ import { JamButton } from './jam-button'
 import { PlayerLikeButton } from './like-button'
 import { PlayerLyricsButton } from './lyrics-button'
 import { MobilePlayer } from './mobile-player'
+import { NativeSongAudio } from './native-song-audio'
 import { PodcastInfo } from './podcast-info'
 import { PodcastPlaybackRate } from './podcast-playback-rate'
 import { PlayerProgress } from './progress'
@@ -72,6 +76,10 @@ export function Player() {
   const { isSong, isRadio, isPodcast } = usePlayerMediaType()
   const audioPlayerRef = usePlayerRef()
   const currentPlaybackRate = usePlayerStore().playerState.currentPlaybackRate
+  const canOutputAudio = useCanOutputAudio()
+  const { enabled: gaplessEnabled } = useGaplessSettings()
+  // The Android app plays songs natively (see NativeSongAudio).
+  const nativeSongs = usesNativeSongPlayer(canOutputAudio, gaplessEnabled)
 
   const song = currentList[currentSongIndex]
   const radio = radioList[currentSongIndex]
@@ -233,7 +241,13 @@ export function Player() {
           </div>
         </div>
 
-        {isSong && song && <SongAudio audioRef={audioRef} />}
+        {isSong &&
+          song &&
+          (nativeSongs ? (
+            <NativeSongAudio audioRef={audioRef} />
+          ) : (
+            <SongAudio audioRef={audioRef} />
+          ))}
 
         {isRadio && radio && (
           <AudioPlayer

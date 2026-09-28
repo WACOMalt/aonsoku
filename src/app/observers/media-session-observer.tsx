@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useCanOutputAudio } from '@/store/connect.store'
 import {
+  useGaplessSettings,
   usePlayerIsPlaying,
   usePlayerMediaType,
   usePlayerSonglist,
@@ -16,6 +18,7 @@ import {
   updateAndroidRadioMediaSession,
 } from '@/utils/androidMediaSession'
 import { appName } from '@/utils/appName'
+import { usesNativeSongPlayer } from '@/utils/nativePlayer'
 import { manageMediaSession } from '@/utils/setMediaSession'
 
 export function MediaSessionObserver() {
@@ -26,6 +29,12 @@ export function MediaSessionObserver() {
     usePlayerSonglist()
   const radioLabel = t('radios.label')
   const androidListenerSetup = useRef(false)
+  const canOutputAudio = useCanOutputAudio()
+  const { enabled: gaplessEnabled } = useGaplessSettings()
+  // Songs played by the Android app's native player have their own media
+  // session and notification; this one would only duplicate them.
+  const nativeSongs =
+    isSong && usesNativeSongPlayer(canOutputAudio, gaplessEnabled)
 
   const song = currentList[currentSongIndex] ?? null
   const radio = radioList[currentSongIndex] ?? null
@@ -61,6 +70,8 @@ export function MediaSessionObserver() {
     // Update playback state on both web and Android
     if (!isAndroid) {
       manageMediaSession.setPlaybackState(isPlaying)
+    } else if (nativeSongs) {
+      destroyAndroidMediaSession()
     } else {
       updateAndroidPlaybackState(isPlaying ?? false)
     }
@@ -92,7 +103,7 @@ export function MediaSessionObserver() {
       title = `${song.artist} - ${song.title}`
       if (!isAndroid) {
         manageMediaSession.setMediaSession(song)
-      } else {
+      } else if (!nativeSongs) {
         updateAndroidMediaSession(song)
       }
     }
@@ -113,6 +124,7 @@ export function MediaSessionObserver() {
     isPodcast,
     isRadio,
     isSong,
+    nativeSongs,
     radio,
     radioLabel,
     song,
