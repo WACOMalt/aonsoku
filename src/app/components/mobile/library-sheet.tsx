@@ -64,45 +64,60 @@ export function LibrarySheet({ open, onOpenChange }: LibrarySheetProps) {
     navigate(route)
   }
 
+  // The panel rests on top of the tab bar but slides in from underneath it:
+  // the bar (z-45) stays above the panel (z-42) and its backdrop (z-41), so
+  // Home, Search and Library remain visible and usable while it is open.
+  // Not modal, because a modal drawer would block taps on the tab bar.
   return (
-    <Drawer
-      open={open}
-      onOpenChange={onOpenChange}
-      shouldScaleBackground={false}
-    >
-      <DrawerContent className="inset-x-0 z-50 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-        <DrawerTitle className="px-5 pt-4 pb-3 text-xl font-bold">
-          {t('sidebar.library')}
-        </DrawerTitle>
-        <DrawerDescription className="sr-only">
-          {t('sidebar.library')}
-        </DrawerDescription>
+    <>
+      <div
+        aria-hidden="true"
+        onClick={() => onOpenChange(false)}
+        className={clsx(
+          'fixed inset-x-0 top-0 bottom-[--bottom-nav-height] z-[41] bg-black/60 transition-opacity duration-300',
+          open ? 'opacity-100' : 'opacity-0 pointer-events-none',
+        )}
+      />
+      <Drawer
+        open={open}
+        onOpenChange={onOpenChange}
+        shouldScaleBackground={false}
+        modal={false}
+      >
+        <DrawerContent className="inset-x-0 bottom-[--bottom-nav-height] z-[42] pb-4 border-b-0">
+          <DrawerTitle className="px-5 pt-4 pb-3 text-xl font-bold">
+            {t('sidebar.library')}
+          </DrawerTitle>
+          <DrawerDescription className="sr-only">
+            {t('sidebar.library')}
+          </DrawerDescription>
 
-        <div className="grid grid-cols-3 gap-3 px-4">
-          {items.map(({ id, title, route, icon: Icon }) => {
-            const isActive =
-              pathname === route || pathname.startsWith(`${route}/`)
+          <div className="grid grid-cols-3 gap-3 px-4">
+            {items.map(({ id, title, route, icon: Icon }) => {
+              const isActive =
+                pathname === route || pathname.startsWith(`${route}/`)
 
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => openPage(route)}
-                aria-current={isActive ? 'page' : undefined}
-                className={clsx(
-                  'flex flex-col items-center justify-center gap-2 h-24 rounded-xl transition-colors active:scale-95',
-                  isActive
-                    ? 'bg-primary/15 text-primary'
-                    : 'bg-accent/60 text-foreground active:bg-accent',
-                )}
-              >
-                <Icon className="size-7" />
-                <span className="text-sm font-medium">{t(title)}</span>
-              </button>
-            )
-          })}
-        </div>
-      </DrawerContent>
-    </Drawer>
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => openPage(route)}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={clsx(
+                    'flex flex-col items-center justify-center gap-2 h-24 rounded-xl transition-colors active:scale-95',
+                    isActive
+                      ? 'bg-primary/15 text-primary'
+                      : 'bg-accent/60 text-foreground active:bg-accent',
+                  )}
+                >
+                  <Icon className="size-7" />
+                  <span className="text-sm font-medium">{t(title)}</span>
+                </button>
+              )
+            })}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </>
   )
 }

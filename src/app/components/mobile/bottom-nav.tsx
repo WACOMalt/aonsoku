@@ -15,42 +15,47 @@ export function MobileBottomNav() {
   const isLibrary = location.pathname.startsWith('/library')
 
   const handleHome = useCallback(() => {
+    setLibraryOpen(false)
     navigate(ROUTES.LIBRARY.HOME)
   }, [navigate])
 
   const handleSearch = useCallback(() => {
+    setLibraryOpen(false)
     setCommandOpen(true)
   }, [setCommandOpen])
 
   const handleLibrary = useCallback(() => {
-    setLibraryOpen(true)
+    setLibraryOpen((open) => !open)
   }, [])
 
   return (
-    // Below the floating player card, which sits on top of it.
-    <nav className="hidden tabbar:block fixed left-0 right-0 bottom-0 z-40 bg-background/95 backdrop-blur-sm h-[--bottom-nav-height]">
-      <div className="flex items-center justify-around h-full">
-        <NavItem
-          icon={Home}
-          label="Home"
-          active={isHome}
-          onClick={handleHome}
-        />
-        <NavItem
-          icon={Search}
-          label="Search"
-          active={false}
-          onClick={handleSearch}
-        />
-        <NavItem
-          icon={Library}
-          label="Library"
-          active={isLibrary || libraryOpen}
-          onClick={handleLibrary}
-        />
-      </div>
+    <>
+      {/* Below the floating player card, and above the Library panel (which
+        is rendered outside it: its blur would trap fixed children). */}
+      <nav className="hidden tabbar:block fixed left-0 right-0 bottom-0 z-[45] bg-background/95 backdrop-blur-sm h-[--bottom-nav-height]">
+        <div className="flex items-center justify-around h-full">
+          <NavItem
+            icon={Home}
+            label="Home"
+            active={isHome && !libraryOpen}
+            onClick={handleHome}
+          />
+          <NavItem
+            icon={Search}
+            label="Search"
+            active={false}
+            onClick={handleSearch}
+          />
+          <NavItem
+            icon={Library}
+            label="Library"
+            active={isLibrary || libraryOpen}
+            onClick={handleLibrary}
+          />
+        </div>
+      </nav>
       <LibrarySheet open={libraryOpen} onOpenChange={setLibraryOpen} />
-    </nav>
+    </>
   )
 }
 
