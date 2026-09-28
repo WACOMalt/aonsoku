@@ -5,6 +5,8 @@ import {
   Pause,
   Play,
   RadioIcon,
+  SkipBack,
+  SkipForward,
   Speaker,
 } from 'lucide-react'
 import { TouchEvent, useCallback, useMemo } from 'react'
@@ -42,8 +44,9 @@ function cardBackground(hex: string | null) {
 
 /**
  * The phone player: a floating card above the tab bar with the artwork,
- * title, a like button and play/pause. Tap it to open the full player, swipe
- * it sideways to change track. Everything else lives in the full player.
+ * title, a like button, previous, play/pause and next. Tap it to open the
+ * full player, swipe it sideways to change track. Everything else lives in
+ * the full player.
  */
 export function MobilePlayer() {
   const { t } = useTranslation()
@@ -182,36 +185,63 @@ export function MobilePlayer() {
           )}
         </div>
 
-        {song && !hideFavoritesSection && (
-          <button
-            type="button"
-            onClick={starCurrentSong}
-            aria-label={t('player.like')}
-            className="size-10 flex items-center justify-center rounded-full shrink-0"
-          >
-            <Heart
-              className={clsx(
-                'size-5',
-                isStarred && 'text-primary fill-primary',
-              )}
-            />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={togglePlayPause}
-          disabled={!hasMedia}
-          aria-label={
-            isPlaying ? t('player.tooltips.pause') : t('player.tooltips.play')
-          }
-          className="size-10 flex items-center justify-center rounded-full shrink-0 disabled:opacity-50"
-        >
-          {isPlaying ? (
-            <Pause className="size-6 fill-current" strokeWidth={0} />
-          ) : (
-            <Play className="size-6 fill-current" strokeWidth={0} />
+        {/* A button that cannot do anything right now is left out, not
+            greyed out, so the title keeps as much room as possible. */}
+        <div className="flex items-center shrink-0">
+          {song && !hideFavoritesSection && (
+            <button
+              type="button"
+              onClick={starCurrentSong}
+              aria-label={t('player.like')}
+              className="size-9 flex items-center justify-center rounded-full"
+            >
+              <Heart
+                className={clsx(
+                  'size-5',
+                  isStarred && 'text-primary fill-primary',
+                )}
+              />
+            </button>
           )}
-        </button>
+          {hasMedia && hasPrev && (
+            <button
+              type="button"
+              onClick={playPrevSong}
+              aria-label={t('player.tooltips.previous')}
+              className="size-9 flex items-center justify-center rounded-full"
+            >
+              <SkipBack className="size-5 fill-current" />
+            </button>
+          )}
+          {hasMedia && (
+            <button
+              type="button"
+              onClick={togglePlayPause}
+              aria-label={
+                isPlaying
+                  ? t('player.tooltips.pause')
+                  : t('player.tooltips.play')
+              }
+              className="size-10 flex items-center justify-center rounded-full"
+            >
+              {isPlaying ? (
+                <Pause className="size-6 fill-current" strokeWidth={0} />
+              ) : (
+                <Play className="size-6 fill-current" strokeWidth={0} />
+              )}
+            </button>
+          )}
+          {hasMedia && canGoNext && (
+            <button
+              type="button"
+              onClick={playNextSong}
+              aria-label={t('player.tooltips.next')}
+              className="size-9 flex items-center justify-center rounded-full"
+            >
+              <SkipForward className="size-5 fill-current" />
+            </button>
+          )}
+        </div>
 
         {(song || podcast) && (
           <div className="absolute left-2 right-2 bottom-0 h-[2px] rounded-full bg-foreground/20 overflow-hidden">
