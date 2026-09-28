@@ -1,8 +1,9 @@
-import { memo } from 'react'
+import { memo, useEffect } from 'react'
 import { Drawer, DrawerContent, DrawerTitle } from '@/app/components/ui/drawer'
 import { useAppWindow } from '@/app/hooks/use-app-window'
 import { useIsMobile } from '@/app/hooks/use-mobile'
 import { usePlayerFullscreen } from '@/store/player.store'
+import { pushBackHandler } from '@/utils/androidBackButton'
 import { FullscreenBackdrop } from './backdrop'
 import { FullscreenDragHandler } from './drag-handler'
 import { MobileFullscreen } from './mobile-view'
@@ -15,6 +16,15 @@ export function FullscreenMode() {
   const { handleDrawerAnimationEnd } = useAppWindow()
   const { isFullscreen, setIsFullscreen } = usePlayerFullscreen()
   const isMobile = useIsMobile()
+
+  // Android back closes the player (after leaving the queue or lyrics).
+  useEffect(() => {
+    if (!isFullscreen) return
+    return pushBackHandler(() => {
+      setIsFullscreen(false)
+      return true
+    }, 10)
+  }, [isFullscreen, setIsFullscreen])
 
   return (
     <Drawer

@@ -39,7 +39,8 @@
         "poster": "Poster"
       }
     },
-    "beta": "Beta"
+    "beta": "Beta",
+    "pressBackAgainToExit": "Press back again to exit"
   },
   "theme": {
     "label": "Theme",

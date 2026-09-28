@@ -14,6 +14,7 @@ import '@/i18n'
 import App from '@/App'
 
 import { queryClient } from '@/lib/queryClient'
+import { initAndroidBackButton } from '@/utils/androidBackButton'
 import { blockFeatures } from '@/utils/browser'
 import { initDeepLinks } from '@/utils/deepLinks'
 import { setupServiceWorker } from '@/utils/serviceWorker'
@@ -21,6 +22,7 @@ import { setupServiceWorker } from '@/utils/serviceWorker'
 blockFeatures()
 setupServiceWorker()
 initDeepLinks()
+initAndroidBackButton()
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <StrictMode>

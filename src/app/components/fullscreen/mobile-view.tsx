@@ -46,6 +46,7 @@ import {
   usePlayerStore,
 } from '@/store/player.store'
 import { LoopState } from '@/types/playerContext'
+import { pushBackHandler } from '@/utils/androidBackButton'
 import { shareItem } from '@/utils/shareLinks'
 import { LyricsTab } from './lyrics'
 import { MarqueeTitle } from './marquee-title'
@@ -70,6 +71,15 @@ export function MobileFullscreen() {
 
   const toggleView = (next: View) =>
     setView((current) => (current === next ? 'playing' : next))
+
+  // Android back from the queue or lyrics returns to the artwork first.
+  useEffect(() => {
+    if (view === 'playing') return
+    return pushBackHandler(() => {
+      setView('playing')
+      return true
+    }, 20)
+  }, [view])
 
   const artSwipe = useSwipe({
     onSwipeLeft: () =>
