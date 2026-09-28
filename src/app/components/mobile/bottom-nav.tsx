@@ -1,14 +1,14 @@
 import { Home, Library, Search } from 'lucide-react'
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { useMainSidebar } from '@/app/components/ui/main-sidebar'
+import { LibrarySheet } from '@/app/components/mobile/library-sheet'
 import { ROUTES } from '@/routes/routesList'
 import { useAppStore } from '@/store/app.store'
 
 export function MobileBottomNav() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { setOpenMobile } = useMainSidebar()
+  const [libraryOpen, setLibraryOpen] = useState(false)
   const setCommandOpen = useAppStore((state) => state.command.setOpen)
 
   const isHome = location.pathname === '/' || location.pathname === ''
@@ -23,8 +23,8 @@ export function MobileBottomNav() {
   }, [setCommandOpen])
 
   const handleLibrary = useCallback(() => {
-    setOpenMobile(true)
-  }, [setOpenMobile])
+    setLibraryOpen(true)
+  }, [])
 
   return (
     // Below the floating player card, which sits on top of it.
@@ -45,10 +45,11 @@ export function MobileBottomNav() {
         <NavItem
           icon={Library}
           label="Library"
-          active={isLibrary}
+          active={isLibrary || libraryOpen}
           onClick={handleLibrary}
         />
       </div>
+      <LibrarySheet open={libraryOpen} onOpenChange={setLibraryOpen} />
     </nav>
   )
 }

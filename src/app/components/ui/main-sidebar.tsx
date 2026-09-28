@@ -19,7 +19,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/app/components/ui/tooltip'
-import { useIsMobile } from '@/app/hooks/use-mobile'
+import { useHasTabBar, useIsMobile } from '@/app/hooks/use-mobile'
 import { useSwipe } from '@/app/hooks/use-swipe'
 import { cn } from '@/lib/utils'
 import { useMainDrawerState } from '@/store/player.store'
@@ -67,6 +67,7 @@ function MainSidebarProvider({
   onOpenChange?: (open: boolean) => void
 }) {
   const isMobile = useIsMobile()
+  const hasTabBar = useHasTabBar()
   const [openMobile, setOpenMobile] = React.useState(false)
 
   // This is the internal state of the sidebar.
@@ -166,7 +167,9 @@ function MainSidebarProvider({
             'compact:pb-[calc(var(--player-height)+var(--bottom-nav-height))]',
             className,
           )}
-          {...(isMobile ? openSwipe : {})}
+          // With the phone tab bar showing, its Library panel replaces the
+          // side menu, so the edge swipe no longer opens it.
+          {...(isMobile && !hasTabBar ? openSwipe : {})}
           {...props}
         >
           {children}

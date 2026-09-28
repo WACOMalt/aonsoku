@@ -29,7 +29,8 @@ export function Header() {
 
       {/* Mobile header layout */}
       <div className="flex md:hidden items-center gap-2 px-3 h-full">
-        <MainSidebarTrigger />
+        {/* Upright phones use the tab bar's Library panel instead. */}
+        <MainSidebarTrigger className="tabbar:hidden" />
         <div className="flex-1 min-w-0">
           <HeaderSongInfo />
         </div>

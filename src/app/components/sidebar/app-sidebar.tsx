@@ -1,4 +1,4 @@
-import CommandMenu from '@/app/components/command/command-menu'
+import { SidebarSearchButton } from '@/app/components/command/command-menu'
 import {
   MainSidebar,
   MainSidebarContent,
@@ -19,7 +19,7 @@ export function AppSidebar({
     <MainSidebar collapsible="icon" {...props}>
       <MobileCloseButton />
       <MainSidebarHeader>
-        <CommandMenu />
+        <SidebarSearchButton />
       </MainSidebarHeader>
       <MiniSidebarSearch />
       <NavMain />

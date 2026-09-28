@@ -27,3 +27,26 @@ export function useIsMobile() {
 
   return isMobile
 }
+
+// Phones held upright, where the bottom tab bar replaces the side menu. Keep
+// in sync with the "tabbar" screen in tailwind.config.js.
+export const TABBAR_MEDIA_QUERY =
+  '(max-width: 767px) and (orientation: portrait), (max-width: 767px) and (min-height: 501px)'
+
+export function useHasTabBar() {
+  const [hasTabBar, setHasTabBar] = useState<boolean>(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia(TABBAR_MEDIA_QUERY).matches
+      : false,
+  )
+
+  useEffect(() => {
+    const mql = window.matchMedia(TABBAR_MEDIA_QUERY)
+    const onChange = () => setHasTabBar(mql.matches)
+    mql.addEventListener('change', onChange)
+    setHasTabBar(mql.matches)
+    return () => mql.removeEventListener('change', onChange)
+  }, [])
+
+  return hasTabBar
+}

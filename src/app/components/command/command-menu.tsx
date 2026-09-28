@@ -33,9 +33,38 @@ export type CommandItemProps = {
   runCommand: (command: () => unknown) => void
 }
 
-export default function CommandMenu() {
+/**
+ * The search box in the expanded sidebar. The search dialog itself is
+ * mounted once in the layout (CommandMenu), so it also opens from the
+ * phone tab bar, where the sidebar is not shown.
+ */
+export function SidebarSearchButton() {
   const { t } = useTranslation()
   const { state: sidebarState } = useMainSidebar()
+  const setOpen = useAppStore((state) => state.command.setOpen)
+
+  if (sidebarState !== 'expanded') return null
+
+  return (
+    <Button
+      variant="outline"
+      className="flex justify-start w-full px-2 gap-2 relative min-w-max active:scale-[98%] transition hover:bg-background-foreground/80"
+      onClick={() => setOpen(true)}
+    >
+      <SearchIcon className="h-4 w-4 text-muted-foreground" />
+      <span className="inline-flex text-muted-foreground text-sm">
+        {t('sidebar.search')}
+      </span>
+
+      <div className="absolute right-2">
+        <Keyboard text="/" />
+      </div>
+    </Button>
+  )
+}
+
+export default function CommandMenu() {
+  const { t } = useTranslation()
   const { open, setOpen } = useAppStore((state) => state.command)
 
   const [query, setQuery] = useState('')
@@ -123,26 +152,8 @@ export default function CommandMenu() {
     enableQuery && !showAlbumGroup && !showArtistGroup && !showSongGroup,
   )
 
-  const sidebarOpen = sidebarState === 'expanded'
-
   return (
     <>
-      {sidebarOpen && (
-        <Button
-          variant="outline"
-          className="flex justify-start w-full px-2 gap-2 relative min-w-max active:scale-[98%] transition hover:bg-background-foreground/80"
-          onClick={() => setOpen(true)}
-        >
-          <SearchIcon className="h-4 w-4 text-muted-foreground" />
-          <span className="inline-flex text-muted-foreground text-sm">
-            {t('sidebar.search')}
-          </span>
-
-          <div className="absolute right-2">
-            <Keyboard text="/" />
-          </div>
-        </Button>
-      )}
       <CommandDialog
         open={open}
         onOpenChange={(state) => {
