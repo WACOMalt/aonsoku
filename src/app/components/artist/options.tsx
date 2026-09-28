@@ -1,10 +1,14 @@
 import { OptionsButtons } from '@/app/components/options/buttons'
 import { DownloadOptionHandler } from '@/app/components/options/download-handler'
-import { DropdownMenuGroup } from '@/app/components/ui/dropdown-menu'
+import {
+  DropdownMenuGroup,
+  DropdownMenuSeparator,
+} from '@/app/components/ui/dropdown-menu'
 import { useOptions } from '@/app/hooks/use-options'
 import { useSongList } from '@/app/hooks/use-song-list'
 import { IArtist } from '@/types/responses/artist'
 import { ISong } from '@/types/responses/song'
+import { shareItem } from '@/utils/shareLinks'
 
 interface ArtistOptionsProps {
   artist: IArtist
@@ -33,6 +37,10 @@ export function ArtistOptions({ artist }: ArtistOptionsProps) {
     startDownload(artist.id)
   }
 
+  function handleShare() {
+    shareItem({ type: 'artist', id: artist.id }, artist.name)
+  }
+
   return (
     <>
       <DropdownMenuGroup>
@@ -42,6 +50,8 @@ export function ArtistOptions({ artist }: ArtistOptionsProps) {
           <OptionsButtons.Download onClick={handleDownload} />
         </DownloadOptionHandler>
       </DropdownMenuGroup>
+      <DropdownMenuSeparator />
+      <OptionsButtons.Share onClick={handleShare} />
     </>
   )
 }

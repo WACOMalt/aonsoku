@@ -9,6 +9,7 @@ import {
   PlayIcon,
   PlusIcon,
   PodcastIcon,
+  ShareIcon,
   Trash,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -172,6 +173,19 @@ function MarkAsPlayed({
   )
 }
 
+function Share({ variant = 'dropdown', ...props }: DropdownMenuItemProps) {
+  const { t } = useTranslation()
+
+  return (
+    <MenuItemFactory
+      variant={variant}
+      icon={<ShareIcon className="mr-2 h-4 w-4" />}
+      label={t('options.share')}
+      {...props}
+    />
+  )
+}
+
 type GotoPodcastProps = DropdownMenuItemProps & {
   type: 'podcast' | 'episode'
 }
@@ -207,4 +221,5 @@ export const OptionsButtons = {
   SongInfo,
   MarkAsPlayed,
   GotoPodcast,
+  Share,
 }

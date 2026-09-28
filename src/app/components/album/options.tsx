@@ -8,6 +8,7 @@ import {
 import { useOptions } from '@/app/hooks/use-options'
 import { useAppStore } from '@/store/app.store'
 import { SingleAlbum } from '@/types/responses/album'
+import { shareItem } from '@/utils/shareLinks'
 
 interface AlbumOptionsProps {
   album: SingleAlbum
@@ -41,6 +42,13 @@ export function AlbumOptions({ album }: AlbumOptionsProps) {
     addToPlaylist(id, songIdToAdd)
   }
 
+  function handleShare() {
+    shareItem(
+      { type: 'album', id: album.id },
+      [album.name, album.artist].filter(Boolean).join(' - '),
+    )
+  }
+
   function handleCreateNewPlaylist() {
     const songIdToAdd = album.song.map((song) => song.id)
 
@@ -68,6 +76,8 @@ export function AlbumOptions({ album }: AlbumOptionsProps) {
       <DownloadOptionHandler>
         <OptionsButtons.Download onClick={handleDownload} />
       </DownloadOptionHandler>
+      <DropdownMenuSeparator />
+      <OptionsButtons.Share onClick={handleShare} />
     </>
   )
 }

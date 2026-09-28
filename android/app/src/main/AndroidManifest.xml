@@ -27,25 +27,34 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Jam invite links, https://<host>/jam/<id>. With autoVerify,
-                 Android opens them straight in the app once the host serves
+            <!-- Jam invites and shared items, https://<host>/jam/<id>,
+                 /song/<id>, /album/<id> and so on. With autoVerify, Android
+                 opens them straight in the app once the host serves
                  /.well-known/assetlinks.json for this signing key. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="https"
-                    android:host="${jamLinkHost}"
-                    android:pathPrefix="/jam/" />
+                <data android:scheme="https" android:host="${jamLinkHost}" />
+                <data android:pathPrefix="/jam/" />
+                <data android:pathPrefix="/song/" />
+                <data android:pathPrefix="/album/" />
+                <data android:pathPrefix="/artist/" />
+                <data android:pathPrefix="/playlist/" />
             </intent-filter>
 
-            <!-- aonsoku://jam/<id>, used by the web app's "Open in the app". -->
+            <!-- aonsoku://jam/<id>, aonsoku://album/<id> and so on, used by
+                 the web app's "Open in the app". -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="aonsoku" android:host="jam" />
+                <data android:scheme="aonsoku" />
+                <data android:host="jam" />
+                <data android:host="song" />
+                <data android:host="album" />
+                <data android:host="artist" />
+                <data android:host="playlist" />
             </intent-filter>
 
         </activity>

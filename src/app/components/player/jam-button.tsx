@@ -16,6 +16,8 @@ import { Switch } from '@/app/components/ui/switch'
 import { jamService } from '@/service/jam'
 import { useJamActions, useJamState } from '@/store/jam.store'
 import { buildJamInviteLink, parseJamSessionId } from '@/utils/jamLinks'
+import { isCapacitor } from '@/utils/platform'
+import { shareUrl } from '@/utils/shareLinks'
 
 export function JamButton() {
   const {
@@ -58,8 +60,11 @@ export function JamButton() {
 
   const copyLink = () => {
     // A path link (not #/jam/...) so the Android app can claim it.
-    navigator.clipboard.writeText(buildJamInviteLink(id!))
-    toast.success('Invite link copied!')
+    shareUrl({
+      url: buildJamInviteLink(id!),
+      title: 'Join my Jam on Aonsoku',
+      copiedMessage: 'Invite link copied!',
+    })
   }
 
   return (
@@ -103,7 +108,7 @@ export function JamButton() {
               <div className="flex justify-between items-center">
                 <span className="font-bold">Session: {id}</span>
                 <Button size="sm" variant="outline" onClick={copyLink}>
-                  Copy Invite Link
+                  {isCapacitor() ? 'Share Invite Link' : 'Copy Invite Link'}
                 </Button>
               </div>
 

@@ -15,6 +15,7 @@ import {
 } from '@/app/components/ui/main-sidebar'
 import { useConnect } from '@/app/hooks/use-connect'
 import { useJamRejoin } from '@/app/hooks/use-jam-rejoin'
+import { useSharedLinkOpener } from '@/app/hooks/use-shared-link'
 import { Header } from '@/app/layout/header'
 import { MainRoutes } from './main'
 
@@ -29,6 +30,7 @@ const MemoMobileBottomNav = memo(MobileBottomNav)
 export default function BaseLayout() {
   useConnect()
   useJamRejoin()
+  useSharedLinkOpener()
 
   return (
     <div className="h-screen w-screen overflow-hidden">

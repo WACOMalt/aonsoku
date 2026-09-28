@@ -3,7 +3,10 @@ import { resolve } from 'path'
 import { IpcChannels } from '../../preload/types'
 import { mainWindow } from '../window'
 
-/** aonsoku://jam/<id> opens a Jam invite in the desktop app. */
+/**
+ * aonsoku://jam/<id> opens a Jam invite in the desktop app, and
+ * aonsoku://album/<id> (or song, artist, playlist) opens a shared item.
+ */
 const PROTOCOL = 'aonsoku'
 
 // A link waits here until the renderer takes it. Holding it rather than

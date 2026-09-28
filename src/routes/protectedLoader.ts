@@ -3,13 +3,15 @@ import { ROUTES } from '@/routes/routesList'
 import { subsonic } from '@/service/subsonic'
 import { useAppStore } from '@/store/app.store'
 import { requestJamJoin } from '@/utils/jamLinks'
+import { requestOpenSharedItem } from '@/utils/shareLinks'
 
 /**
- * If the URL is a Jam invite, remember it so the join prompt appears right
- * after login. The pending invite is persisted, so it survives the redirect.
+ * If the URL is a Jam invite or a shared item, remember it so it opens right
+ * after login instead of being lost to the redirect.
  */
-function savePendingJamSessionId() {
-  requestJamJoin(window.location.href)
+function savePendingLink() {
+  const url = window.location.href
+  if (!requestJamJoin(url)) requestOpenSharedItem(url)
 }
 
 export async function protectedLoader() {
@@ -18,8 +20,7 @@ export async function protectedLoader() {
   const hasNoToken = !password || password === ''
 
   if (hasNoUrl || hasNoToken || !isServerConfigured) {
-    // Save pending jam session ID before redirecting to login
-    savePendingJamSessionId()
+    savePendingLink()
     return redirect(ROUTES.SERVER_CONFIG)
   }
 

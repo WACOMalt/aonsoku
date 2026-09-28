@@ -1,13 +1,18 @@
 import { isDesktop } from '@/utils/desktop'
 import { requestJamJoin } from '@/utils/jamLinks'
 import { isCapacitor } from '@/utils/platform'
+import { requestOpenSharedItem } from '@/utils/shareLinks'
 
 /**
- * Receives Jam links the operating system hands to the app: an https invite
- * link or aonsoku://jam/<id> on Android, and aonsoku://jam/<id> on desktop.
- * Each one becomes a pending invite, which the join prompt picks up once the
- * listener is signed in.
+ * Receives links the operating system hands to the app: https links to the
+ * web app or aonsoku:// links on Android, and aonsoku:// links on desktop.
+ * A Jam invite becomes a pending invite for the join prompt; a shared song,
+ * album, artist or playlist opens once the listener is signed in.
  */
+function openLink(url: string) {
+  if (!requestJamJoin(url)) requestOpenSharedItem(url)
+}
+
 export function initDeepLinks() {
   if (isCapacitor()) {
     initAndroidLinks().catch((error) => {
@@ -21,12 +26,10 @@ export function initDeepLinks() {
 async function initAndroidLinks() {
   const { App } = await import('@capacitor/app')
   // Links that arrive while the app is running.
-  await App.addListener('appUrlOpen', ({ url }) => {
-    requestJamJoin(url)
-  })
+  await App.addListener('appUrlOpen', ({ url }) => openLink(url))
   // The link that launched the app, if any.
   const launch = await App.getLaunchUrl()
-  if (launch?.url) requestJamJoin(launch.url)
+  if (launch?.url) openLink(launch.url)
 }
 
 function initDesktopLinks() {
@@ -34,7 +37,7 @@ function initDesktopLinks() {
     window.api
       .getPendingDeepLink()
       .then((url) => {
-        if (url) requestJamJoin(url)
+        if (url) openLink(url)
       })
       .catch(() => {})
   }

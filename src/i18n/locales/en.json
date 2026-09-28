@@ -469,7 +469,8 @@
     "goto": {
       "episode": "Go to episode",
       "podcast": "Go to podcast"
-    }
+    },
+    "share": "Share"
   },
   "radios": {
     "label": "Radio",
@@ -824,5 +825,11 @@
       "y": "1 year",
       "yy": "%d years"
     }
+  },
+  "share": {
+    "copied": "Link copied.",
+    "failed": "Couldn't copy the link.",
+    "privatePlaylist": "This playlist is private, so only you can open the link.",
+    "songNotFound": "That song isn't on your server."
   }
 }

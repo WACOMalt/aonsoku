@@ -48,10 +48,11 @@ server {
         proxy_send_timeout 86400;
     }
 
-    # Shareable Jam links. The Android app claims these directly; browsers
-    # are sent to the hash route the web app understands.
-    location ~ "^/jam/([A-Za-z0-9]{6,32})/?$" {
-        return 302 /#/jam/$1;
+    # Shareable links: Jam invites and shared songs, albums, artists and
+    # playlists. The Android app claims these directly; browsers are sent to
+    # the hash route the web app understands.
+    location ~ "^/(jam|song|album|artist|playlist)/([A-Za-z0-9._-]{1,64})/?$" {
+        return 302 /#/$1/$2;
     }
 
     # Lets Android verify that the app may open this site's Jam links.

@@ -77,6 +77,8 @@ interface DataTableProps<TData, TValue> {
   dataType?: 'song' | 'artist' | 'playlist' | 'radio' | 'genre'
   onRowClick?: (row: Row<TData>) => void
   enableVirtualization?: boolean
+  /** Id of a row to select and scroll to once, e.g. a song from a share link. */
+  highlightRowId?: string | null
 }
 
 let isTap = false
@@ -99,6 +101,7 @@ export function DataTable<TData, TValue>({
   dataType = 'song',
   onRowClick,
   enableVirtualization = false,
+  highlightRowId,
 }: DataTableProps<TData, TValue>) {
   const { t } = useTranslation()
   const newColumns = columns.filter((column) => {
@@ -242,6 +245,57 @@ export function DataTable<TData, TValue>({
   })
 
   const virtualRows = virtualizer.getVirtualItems()
+
+  const highlightedRowRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!highlightRowId || highlightedRowRef.current === highlightRowId) return
+    if (enableVirtualization && !scrollElement) return
+
+    const index = rows.findIndex(
+      (row) => (row.original as { id?: string }).id === highlightRowId,
+    )
+    if (index === -1) return
+    highlightedRowRef.current = highlightRowId
+    setRowSelection({ [rows[index].id]: true })
+
+    const container = tableContainerRef.current
+    if (!container) return
+
+    const findRow = () =>
+      enableVirtualization
+        ? container.querySelector<HTMLElement>(`[data-index="${index}"]`)
+        : container.querySelectorAll<HTMLElement>('[data-test-id="table-row"]')[
+            index
+          ]
+
+    // A virtualized row may not be rendered yet: jump the page to roughly
+    // where it will be, then center it once it exists. The table does not
+    // start at the top of the scroll area, so offset by where it sits.
+    const jumpNear = () => {
+      if (!scrollElement) return
+      const tableTop =
+        container.getBoundingClientRect().top -
+        scrollElement.getBoundingClientRect().top +
+        scrollElement.scrollTop
+      const rowStart =
+        virtualizer.measurementsCache[index]?.start ??
+        index * TABLE_ROW_SIZES.DEFAULT
+      scrollElement.scrollTop =
+        tableTop + rowStart - scrollElement.clientHeight / 2
+    }
+
+    const reveal = (attempt = 0) => {
+      const element = findRow()
+      if (element) {
+        element.scrollIntoView({ block: 'center', behavior: 'smooth' })
+        return
+      }
+      if (attempt === 0) jumpNear()
+      if (attempt < 20) requestAnimationFrame(() => reveal(attempt + 1))
+    }
+    requestAnimationFrame(() => reveal())
+  }, [highlightRowId, rows, enableVirtualization, scrollElement, virtualizer])
 
   const getContextMenuOptions = useCallback(
     (row: Row<TData>) => {

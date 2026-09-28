@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { OptionsButtons } from '@/app/components/options/buttons'
 import { DownloadOptionHandler } from '@/app/components/options/download-handler'
 import { DropdownMenuSeparator } from '@/app/components/ui/dropdown-menu'
@@ -8,6 +9,7 @@ import { usePlaylists, useRemovePlaylist } from '@/store/playlists.store'
 import { PlaybackSource } from '@/types/playerContext'
 import { Playlist, PlaylistWithEntries } from '@/types/responses/playlist'
 import { ISong } from '@/types/responses/song'
+import { shareItem } from '@/utils/shareLinks'
 
 type GetSongsToQueueCallback = (songs: ISong[], source?: PlaybackSource) => void
 
@@ -32,6 +34,7 @@ export function PlaylistOptions({
   disableEdit = false,
   disableDelete = false,
 }: PlaylistOptionsProps) {
+  const { t } = useTranslation()
   const { setPlaylistDialogState, setData } = usePlaylists()
   const { play, playNext, playLast, startDownload } = useOptions()
   const { setPlaylistId, setConfirmDialogState } = useRemovePlaylist()
@@ -146,6 +149,17 @@ export function PlaylistOptions({
           }}
         />
       </DownloadOptionHandler>
+      <OptionsButtons.Share
+        variant={variant}
+        onClick={(e) => {
+          e.stopPropagation()
+          shareItem(
+            { type: 'playlist', id: playlist.id },
+            playlist.name,
+            playlist.public ? undefined : t('share.privatePlaylist'),
+          )
+        }}
+      />
       <DropdownMenuSeparator />
       <OptionsButtons.EditPlaylist
         variant={variant}

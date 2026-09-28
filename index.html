@@ -3,12 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <script>
-      // Shareable Jam links are /jam/<id> so the Android app can claim them,
-      // but the app routes with a hash. Hop to #/jam/<id> before anything
-      // else loads; relative asset paths would not resolve under /jam/.
+      // Shareable links are paths like /jam/<id> or /album/<id> so the
+      // Android app can claim them, but the app routes with a hash. Hop to
+      // #/album/<id> before anything else loads; relative asset paths would
+      // not resolve under /album/.
       (function () {
-        var m = location.pathname.match(/^(.*)\/jam\/([A-Za-z0-9]{6,32})\/?$/)
-        if (m) location.replace(m[1] + '/#/jam/' + m[2])
+        var m = location.pathname.match(
+          /^(.*)\/(jam|song|album|artist|playlist)\/([A-Za-z0-9._-]{1,64})\/?$/
+        )
+        if (m) location.replace(m[1] + '/#/' + m[2] + '/' + m[3])
       })()
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

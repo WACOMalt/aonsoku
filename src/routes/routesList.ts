@@ -1,3 +1,4 @@
+import { SharedItemType } from '@/store/share-link.store'
 import { AlbumListType } from '@/types/responses/album'
 import { AlbumsFilters, YearFilter } from '@/utils/albumsFilter'
 
@@ -22,6 +23,8 @@ const ARTIST = {
 const ALBUM = {
   PAGE: (albumId: string) => `${LIBRARY.ALBUMS}/${albumId}`,
   PATH: `${LIBRARY.ALBUMS}/:albumId`,
+  /** Query parameter naming a song to highlight, used by shared song links. */
+  SONG_PARAM: 'song',
 }
 
 const ALBUMS = {
@@ -80,6 +83,11 @@ const JAM = {
   PATH: '/jam/:sessionId',
 }
 
+/** Landing routes for share links, e.g. /album/<id>. */
+const SHARED = {
+  PATH: (type: SharedItemType) => `/${type}/:itemId`,
+}
+
 export const ROUTES = {
   LIBRARY,
   ARTIST,
@@ -93,4 +101,5 @@ export const ROUTES = {
   GENRE,
   SERVER_CONFIG,
   JAM,
+  SHARED,
 }

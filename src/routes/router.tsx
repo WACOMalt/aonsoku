@@ -25,6 +25,7 @@ import { albumsLoader } from '@/routes/loaders/albumsLoader'
 import { loginLoader } from '@/routes/loginLoader'
 import { podcastsLoader, protectedLoader } from '@/routes/protectedLoader'
 import { ROUTES } from '@/routes/routesList'
+import { SHARED_ITEM_TYPES } from '@/store/share-link.store'
 
 const BaseLayout = lazy(() => import('@/app/layout/base'))
 const Album = lazy(() => import('@/app/pages/albums/album'))
@@ -49,6 +50,7 @@ const LatestEpisodes = lazy(
   () => import('@/app/pages/podcasts/latest-episodes'),
 )
 const JamJoin = lazy(() => import('@/app/pages/jam/join'))
+const OpenSharedItem = lazy(() => import('@/app/pages/shared/open'))
 
 export const router = createHashRouter([
   {
@@ -230,6 +232,15 @@ export const router = createHashRouter([
           </Suspense>
         ),
       },
+      ...SHARED_ITEM_TYPES.map((type) => ({
+        id: `shared-${type}`,
+        path: ROUTES.SHARED.PATH(type),
+        element: (
+          <Suspense>
+            <OpenSharedItem type={type} />
+          </Suspense>
+        ),
+      })),
       {
         id: 'error',
         path: '*',

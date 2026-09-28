@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { AlbumComment } from '@/app/components/album/comment'
 import ImageHeader from '@/app/components/album/image-header'
 import { AlbumInfo } from '@/app/components/album/info'
@@ -27,6 +27,8 @@ import { convertSecondsToHumanRead } from '@/utils/convertSecondsToTime'
 
 export default function Album() {
   const { albumId } = useParams() as { albumId: string }
+  const [searchParams] = useSearchParams()
+  const sharedSongId = searchParams.get(ROUTES.ALBUM.SONG_PARAM)
   const { setSongList } = usePlayerActions()
   const { t } = useTranslation()
 
@@ -150,6 +152,7 @@ export default function Album() {
           showDiscNumber={true}
           variant="modern"
           enableVirtualization={true}
+          highlightRowId={sharedSongId}
         />
 
         {albumComment && <AlbumComment comment={albumComment} />}

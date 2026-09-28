@@ -9,6 +9,7 @@ import {
 import { useOptions } from '@/app/hooks/use-options'
 import { useAppStore } from '@/store/app.store'
 import { ISong } from '@/types/responses/song'
+import { shareItem } from '@/utils/shareLinks'
 import { AddToPlaylistSubMenu } from './add-to-playlist'
 
 interface SelectedSongsProps {
@@ -60,6 +61,17 @@ export function SelectedSongsMenuOptions({ table }: SelectedSongsProps) {
     const songIndexes = rows.map((row) => row.index.toString())
 
     reset(() => songOptions.removeSongFromPlaylist(songIndexes))
+  }
+
+  function handleShare() {
+    if (!isSingleSelected) return
+
+    reset(() =>
+      shareItem(
+        { type: 'song', id: firstSong.id },
+        [firstSong.title, firstSong.artist].filter(Boolean).join(' - '),
+      ),
+    )
   }
 
   function handleSongInfoOption() {
@@ -117,6 +129,13 @@ export function SelectedSongsMenuOptions({ table }: SelectedSongsProps) {
             />
           </DownloadOptionHandler>
           <ContextMenuSeparator />
+          <OptionsButtons.Share
+            variant="context"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleShare()
+            }}
+          />
           <OptionsButtons.SongInfo
             variant="context"
             onClick={(e) => {

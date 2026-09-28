@@ -4,6 +4,7 @@ import { ContextMenuSeparator } from '@/app/components/ui/context-menu'
 import { useOptions } from '@/app/hooks/use-options'
 import { useAppStore } from '@/store/app.store'
 import { ISong } from '@/types/responses/song'
+import { shareItem } from '@/utils/shareLinks'
 import { AddToPlaylistSubMenu } from './add-to-playlist'
 
 interface SongMenuOptionsProps {
@@ -77,6 +78,16 @@ export function SongMenuOptions({
         />
       </DownloadOptionHandler>
       <ContextMenuSeparator />
+      <OptionsButtons.Share
+        variant={variant}
+        onClick={(e) => {
+          e.stopPropagation()
+          shareItem(
+            { type: 'song', id: song.id },
+            [song.title, song.artist].filter(Boolean).join(' - '),
+          )
+        }}
+      />
       <OptionsButtons.SongInfo
         variant={variant}
         onClick={(e) => {
