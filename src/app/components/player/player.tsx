@@ -1,20 +1,6 @@
-import clsx from 'clsx'
-import {
-  AudioLines,
-  Pause,
-  Play,
-  RadioIcon,
-  Repeat,
-  Shuffle,
-  SkipBack,
-  SkipForward,
-} from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
-import { LazyLoadImage } from 'react-lazy-load-image-component'
 import { getSongStreamUrl } from '@/api/httpClient'
 import { getProxyURL } from '@/api/podcastClient'
-import RepeatOne from '@/app/components/icons/repeat-one'
-import { ImageLoader } from '@/app/components/image-loader'
 import { MiniPlayerButton } from '@/app/components/mini-player/button'
 import { RadioInfo } from '@/app/components/player/radio-info'
 import { TrackInfo } from '@/app/components/player/track-info'
@@ -23,15 +9,10 @@ import { useAppMediaCache, useAppStore } from '@/store/app.store'
 import {
   getVolume,
   usePlayerActions,
-  usePlayerDuration,
-  usePlayerFullscreen,
   usePlayerIsPlaying,
   usePlayerLoop,
   usePlayerMediaType,
-  usePlayerPrevAndNext,
-  usePlayerProgress,
   usePlayerRef,
-  usePlayerShuffle,
   usePlayerSonglist,
   usePlayerStore,
   useReplayGainState,
@@ -50,6 +31,7 @@ import { PlayerExpandButton } from './expand-button'
 import { JamButton } from './jam-button'
 import { PlayerLikeButton } from './like-button'
 import { PlayerLyricsButton } from './lyrics-button'
+import { MobilePlayer } from './mobile-player'
 import { PodcastInfo } from './podcast-info'
 import { PodcastPlaybackRate } from './podcast-playback-rate'
 import { PlayerProgress } from './progress'
@@ -72,6 +54,7 @@ const MemoPlayerExpandButton = memo(PlayerExpandButton)
 const MemoPodcastPlaybackRate = memo(PodcastPlaybackRate)
 const MemoLyricsButton = memo(PlayerLyricsButton)
 const MemoMiniPlayerButton = memo(MiniPlayerButton)
+const MemoMobilePlayer = memo(MobilePlayer)
 
 export function Player() {
   const hideFavoritesSection = useAppStore().pages.hideFavoritesSection
@@ -86,34 +69,20 @@ export function Player() {
     handleSongEnded,
     getCurrentProgress,
     getCurrentPodcastProgress,
-    togglePlayPause,
-    playPrevSong,
-    playNextSong,
-    isPlayingOneSong,
-    toggleShuffle,
-    toggleLoop,
   } = usePlayerActions()
   const { currentList, currentSongIndex, radioList, podcastList } =
     usePlayerSonglist()
   const isPlaying = usePlayerIsPlaying()
   const { isSong, isRadio, isPodcast } = usePlayerMediaType()
   const loopState = usePlayerLoop()
-  const isShuffleActive = usePlayerShuffle()
-  const { hasPrev, hasNext } = usePlayerPrevAndNext()
   const audioPlayerRef = usePlayerRef()
   const currentPlaybackRate = usePlayerStore().playerState.currentPlaybackRate
   const { replayGainType, replayGainPreAmp, replayGainDefaultGain } =
     useReplayGainState()
-  const progress = usePlayerProgress()
-  const currentDuration = usePlayerDuration()
-  const { setIsFullscreen } = usePlayerFullscreen()
 
   const song = currentList[currentSongIndex]
   const radio = radioList[currentSongIndex]
   const podcast = podcastList[currentSongIndex]
-
-  const progressPercent =
-    currentDuration > 0 ? (progress / currentDuration) * 100 : 0
 
   const mediaCacheEnabled = useAppMediaCache()
   const songId = song?.id
@@ -251,174 +220,18 @@ export function Player() {
 
   return (
     <>
-      <MemoControllerBanner />
-      <footer className="border-t h-[--player-height] w-full fixed bottom-0 left-0 right-0 z-40 bg-background">
-        {/* Mobile player - two rows */}
-        <div className="flex flex-col md:hidden h-[calc(var(--player-height)-1px)]">
-          {/* Progress bar */}
-          <div className="h-1 bg-secondary shrink-0">
-            <div
-              className="h-full bg-primary transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-
-          {/* Row 1: Main controls */}
-          <div
-            className="flex items-center gap-2 px-3 h-12 shrink-0 cursor-pointer"
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest('button')) return
-              if (isSong && song) setIsFullscreen(true)
-            }}
-          >
-            {/* Cover art thumbnail */}
-            <div className="w-10 h-10 rounded overflow-hidden shrink-0 bg-muted flex items-center justify-center">
-              {isSong && song ? (
-                <ImageLoader id={song.coverArt} type="song" size={80}>
-                  {(src) => (
-                    <LazyLoadImage
-                      src={src}
-                      width="100%"
-                      height="100%"
-                      className="aspect-square object-cover w-full h-full text-transparent"
-                      alt={`${song.artist} - ${song.title}`}
-                    />
-                  )}
-                </ImageLoader>
-              ) : isRadio ? (
-                <RadioIcon className="w-5 h-5" strokeWidth={1} />
-              ) : isPodcast && podcast ? (
-                <LazyLoadImage
-                  src={podcast.image_url}
-                  width="100%"
-                  height="100%"
-                  className="aspect-square object-cover w-full h-full text-transparent"
-                  alt={podcast.title}
-                />
-              ) : (
-                <AudioLines className="w-5 h-5" />
-              )}
-            </div>
-
-            {/* Title/Artist */}
-            <div className="flex-1 min-w-0">
-              {isSong && song ? (
-                <>
-                  <p className="text-sm font-medium truncate">{song.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {song.artist}
-                  </p>
-                </>
-              ) : isRadio && radio ? (
-                <>
-                  <p className="text-sm font-medium truncate">{radio.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    Radio
-                  </p>
-                </>
-              ) : isPodcast && podcast ? (
-                <>
-                  <p className="text-sm font-medium truncate">
-                    {podcast.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {podcast.podcast.title}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">No song playing</p>
-              )}
-            </div>
-
-            {/* Transport controls */}
-            <div
-              className="flex items-center gap-0.5"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                onClick={playPrevSong}
-                disabled={!hasPrev || (!song && !radio && !podcast)}
-                className="size-8 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent disabled:opacity-50"
-              >
-                <SkipBack className="size-4 fill-current" />
-              </button>
-              <button
-                onClick={togglePlayPause}
-                disabled={!song && !radio && !isPodcast}
-                className="size-9 flex items-center justify-center rounded-full hover:bg-accent disabled:opacity-50"
-              >
-                {isPlaying ? (
-                  <Pause className="size-5 fill-foreground" />
-                ) : (
-                  <Play className="size-5 fill-foreground" />
-                )}
-              </button>
-              <button
-                onClick={playNextSong}
-                disabled={
-                  (!hasNext && loopState !== LoopState.All) ||
-                  (!song && !radio && !podcast)
-                }
-                className="size-8 flex items-center justify-center rounded-full text-muted-foreground hover:bg-accent disabled:opacity-50"
-              >
-                <SkipForward className="size-4 fill-current" />
-              </button>
-              <div className="[&_button]:!size-7 [&_button]:!p-0 [&_button_svg]:!size-3.5">
-                <MemoPlayerVolume
-                  audioRef={getAudioRef()}
-                  disabled={!song && !radio && !podcast}
-                  vertical
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Row 2: Secondary controls - smaller */}
-          <div className="flex items-center justify-around px-3 h-8 shrink-0 [&_button]:!size-7 [&_button]:!p-0 [&_button_svg]:!size-3.5">
-            {isSong && !hideFavoritesSection && (
-              <MemoPlayerLikeButton disabled={!song} />
-            )}
-            {isSong && <MemoPlayerQueueButton disabled={!song} />}
-            {isSong && <MemoLyricsButton disabled={!song} />}
-            <MemoJamButton />
-            <MemoDevicePicker />
-            {isSong && (
-              <button
-                disabled={!song || isPlayingOneSong() || !hasNext}
-                onClick={toggleShuffle}
-                className={clsx(
-                  'size-7 flex items-center justify-center rounded-full relative',
-                  isShuffleActive ? 'text-primary' : 'text-muted-foreground',
-                  (!song || isPlayingOneSong() || !hasNext) && 'opacity-50',
-                )}
-              >
-                <Shuffle className="size-3.5" />
-              </button>
-            )}
-            {isSong && (
-              <button
-                disabled={!song}
-                onClick={toggleLoop}
-                className={clsx(
-                  'size-7 flex items-center justify-center rounded-full relative',
-                  loopState !== LoopState.Off
-                    ? 'text-primary'
-                    : 'text-muted-foreground',
-                  !song && 'opacity-50',
-                )}
-              >
-                {loopState === LoopState.One ? (
-                  <RepeatOne className="size-3.5" size={14} />
-                ) : (
-                  <Repeat className="size-3.5" />
-                )}
-              </button>
-            )}
-          </div>
+      {/* On phones the player card says where Connect is playing instead. */}
+      <div className="compact:hidden">
+        <MemoControllerBanner />
+      </div>
+      <footer className="border-t h-[--player-height] w-full fixed bottom-0 left-0 right-0 z-40 bg-background compact:border-t-0 compact:bg-transparent compact:bottom-[--bottom-nav-height]">
+        {/* Phone player: a floating card above the tab bar */}
+        <div className="hidden compact:block h-full">
+          <MemoMobilePlayer />
         </div>
 
         {/* Desktop player layout */}
-        <div className="w-full h-full hidden md:grid grid-cols-player gap-2 px-4 items-center">
+        <div className="w-full h-full hidden md:grid compact:hidden grid-cols-player gap-2 px-4 items-center">
           {/* Track Info */}
           <div className="flex items-center gap-2 w-full">
             {isSong && <MemoTrackInfo song={song} />}

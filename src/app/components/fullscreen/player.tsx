@@ -12,8 +12,8 @@ export function FullscreenPlayer() {
     <div className="w-full">
       <FullscreenProgress />
 
-      {/* Mobile layout: two rows (also sideways phones, beside the art) */}
-      <div className="flex flex-col md:hidden landscape-short:flex gap-1 mt-2">
+      {/* Mobile layout: two rows */}
+      <div className="flex flex-col md:hidden gap-1 mt-2">
         <div className="flex justify-center items-center gap-1">
           <FullscreenControls />
         </div>
@@ -30,7 +30,7 @@ export function FullscreenPlayer() {
       </div>
 
       {/* Desktop layout: single row */}
-      <div className="hidden md:flex landscape-short:hidden items-center justify-between gap-4 mt-5">
+      <div className="hidden md:flex items-center justify-between gap-4 mt-5">
         <div className="w-[200px] flex items-center gap-2 justify-start">
           <CloseFullscreenButton />
           <FullscreenSettings />

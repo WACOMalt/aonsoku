@@ -3,6 +3,9 @@ import { TouchEvent, useCallback, useRef } from 'react'
 interface UseSwipeOptions {
   onSwipeLeft?: () => void
   onSwipeRight?: () => void
+  /** Vertical swipes are only detected when one of these is given. */
+  onSwipeUp?: () => void
+  onSwipeDown?: () => void
   /** Minimum horizontal distance in pixels to count as a swipe. */
   threshold?: number
   /** Maximum time in milliseconds for the gesture to count as a swipe. */
@@ -54,6 +57,8 @@ function startedInHorizontalScroller(target: HTMLElement | null) {
 export function useSwipe({
   onSwipeLeft,
   onSwipeRight,
+  onSwipeUp,
+  onSwipeDown,
   threshold = 70,
   maxDuration = 600,
 }: UseSwipeOptions) {
@@ -69,7 +74,10 @@ export function useSwipe({
     if (!touch) return
 
     const target = event.target as HTMLElement | null
-    if (target?.closest(INTERACTIVE_SELECTOR)) return
+    // Only something inside the swipe area counts; the area may itself sit
+    // in a drawer (the full player), which must not block its own swipes.
+    const blocker = target?.closest(INTERACTIVE_SELECTOR)
+    if (blocker && (event.currentTarget as Node).contains(blocker)) return
     if (startedInHorizontalScroller(target)) return
 
     start.current = { x: touch.clientX, y: touch.clientY, time: Date.now() }
@@ -89,14 +97,19 @@ export function useSwipe({
       const dx = touch.clientX - origin.x
       const dy = touch.clientY - origin.y
 
-      // Require a clearly horizontal movement.
-      if (Math.abs(dx) < threshold) return
-      if (Math.abs(dx) < Math.abs(dy) * 1.5) return
-
-      if (dx < 0) onSwipeLeft?.()
-      else onSwipeRight?.()
+      // Require a clearly horizontal or clearly vertical movement.
+      if (Math.abs(dx) >= threshold && Math.abs(dx) >= Math.abs(dy) * 1.5) {
+        if (dx < 0) onSwipeLeft?.()
+        else onSwipeRight?.()
+      } else if (
+        Math.abs(dy) >= threshold &&
+        Math.abs(dy) >= Math.abs(dx) * 1.5
+      ) {
+        if (dy < 0) onSwipeUp?.()
+        else onSwipeDown?.()
+      }
     },
-    [onSwipeLeft, onSwipeRight, threshold, maxDuration],
+    [onSwipeLeft, onSwipeRight, onSwipeUp, onSwipeDown, threshold, maxDuration],
   )
 
   return { onTouchStart, onTouchEnd }

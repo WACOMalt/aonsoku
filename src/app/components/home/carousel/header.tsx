@@ -44,7 +44,8 @@ export function HomeHeader() {
           </CarouselItem>
         ))}
       </CarouselContent>
-      <div className="absolute right-8 bottom-6 flex items-center gap-2">
+      {/* Phones swipe the banner instead. */}
+      <div className="absolute right-8 bottom-6 flex items-center gap-2 compact:hidden">
         <CarouselPrevious
           data-testid="header-carousel-previous"
           className="relative inset-0 translate-x-0 translate-y-0 shadow-sm"

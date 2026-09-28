@@ -162,10 +162,15 @@ module.exports = {
       screens: {
         'mid-player': { raw: '(min-height: 133px) and (max-height: 170px)' },
         'mini-player': { raw: '(max-height: 132px)' },
-        // Phones turned sideways: wide enough for the desktop layout but far
-        // too short for it.
-        'landscape-short': {
-          raw: '(orientation: landscape) and (max-height: 500px) and (min-width: 640px)',
+        // The phone layout: narrow screens, and touch screens turned sideways (wide
+        // but far too short for the desktop layout). Matches the
+        // media query in index.css and useIsMobile.
+        compact: {
+          raw: '(max-width: 767px), (orientation: landscape) and (max-height: 500px) and (min-width: 640px) and (pointer: coarse)',
+        },
+        // Phones held upright, where the bottom tab bar is shown.
+        tabbar: {
+          raw: '(max-width: 767px) and (orientation: portrait), (max-width: 767px) and (min-height: 501px)',
         },
       },
     },

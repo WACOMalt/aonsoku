@@ -372,7 +372,19 @@
     "queue": "Queue",
     "playing": "Playing now",
     "lyrics": "Lyrics",
-    "switchButton": "Switch to Big Player"
+    "switchButton": "Switch to Big Player",
+    "close": "Close player",
+    "more": "More options",
+    "nowPlaying": "Now playing",
+    "playingFrom": {
+      "album": "Playing from album",
+      "playlist": "Playing from playlist",
+      "artist": "Playing from artist",
+      "favourite": "Playing from favorites",
+      "songs": "Playing from songs"
+    },
+    "goToAlbum": "Go to album",
+    "goToArtist": "Go to artist"
   },
   "logout": {
     "dialog": {
@@ -448,7 +460,9 @@
         "mute": "Mute",
         "unmute": "Unmute"
       }
-    }
+    },
+    "playingOn": "Playing on {{device}}",
+    "like": "Like"
   },
   "options": {
     "play": "Play",

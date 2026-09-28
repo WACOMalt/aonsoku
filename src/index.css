@@ -55,12 +55,22 @@
     --windows-red: 5 75% 44%;
   }
 
-  @media (max-width: 767px) {
+  /* Phone layout ("compact" in tailwind.config.js): narrow screens, and
+     phones turned sideways, which are wide but far too short for the
+     desktop layout. The player is a floating card above the tab bar. */
+  @media (max-width: 767px),
+    (orientation: landscape) and (max-height: 500px) and (
+      min-width: 640px
+    ) and (pointer: coarse) {
     :root {
-      --player-height: 96px;
-      --header-height: 40px;
-      --bottom-nav-height: 48px;
-      --content-height: calc(100vh - var(--header-height) - var(--player-height) - var(--bottom-nav-height));
+      --player-height: 64px;
+      --bottom-nav-height: 56px;
+      --content-height: calc(
+        100vh -
+        var(--header-height) -
+        var(--player-height) -
+        var(--bottom-nav-height)
+      );
       --empty-content-height: calc(
         100vh -
         var(--header-height) -
@@ -68,6 +78,19 @@
         var(--player-height) -
         var(--bottom-nav-height)
       );
+    }
+  }
+
+  @media (max-width: 767px) {
+    :root {
+      --header-height: 40px;
+    }
+  }
+
+  /* Sideways there is no room for the tab bar; the header opens the menu. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    :root {
+      --bottom-nav-height: 0px;
     }
   }
 }
@@ -82,6 +105,21 @@ button {
 
 .Toastify__toast-container {
   padding: 0px !important;
+}
+
+/* Phones: toasts float just above the player card and tab bar rather than
+   at the screen edge (react-toastify's own phone style pins them to it). */
+@media (max-width: 767px),
+  (orientation: landscape) and (max-height: 500px) and (min-width: 640px) and (
+    pointer: coarse
+  ) {
+  .Toastify__toast-container--bottom-center {
+    bottom: calc(var(--player-height) + var(--bottom-nav-height) + 0.5rem) !important;
+    left: 0.5rem !important;
+    right: 0.5rem !important;
+    width: auto !important;
+    transform: none !important;
+  }
 }
 
 .Toastify__progress-bar--wrp {

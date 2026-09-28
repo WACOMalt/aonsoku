@@ -27,8 +27,9 @@ export function MobileBottomNav() {
   }, [setOpenMobile])
 
   return (
-    <nav className="md:hidden fixed left-0 right-0 z-40 bg-background border-t border-border bottom-[--player-height]">
-      <div className="flex items-center justify-around h-12">
+    // Below the floating player card, which sits on top of it.
+    <nav className="hidden tabbar:block fixed left-0 right-0 bottom-0 z-40 bg-background/95 backdrop-blur-sm h-[--bottom-nav-height]">
+      <div className="flex items-center justify-around h-full">
         <NavItem
           icon={Home}
           label="Home"
@@ -70,8 +71,8 @@ function NavItem({
         active ? 'text-primary' : 'text-muted-foreground'
       }`}
     >
-      <Icon className="size-5" />
-      <span className="text-[10px]">{label}</span>
+      <Icon className="size-6" />
+      <span className="text-[11px] font-medium">{label}</span>
     </button>
   )
 }

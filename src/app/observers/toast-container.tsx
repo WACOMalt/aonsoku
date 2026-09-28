@@ -1,10 +1,15 @@
 import { XIcon } from 'lucide-react'
 import { ToastContainer as Container } from 'react-toastify'
 import { Button } from '@/app/components/ui/button'
+import { useIsMobile } from '@/app/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 import { toastColors } from '@/utils/toastColors'
 
 export function ToastContainer() {
+  // On phones toasts sit just above the player card (see
+  // --toastify-toast-bottom), out of the way of the header and full player.
+  const isMobile = useIsMobile()
+
   return (
     <Container
       toastClassName={(context) => {
@@ -18,7 +23,7 @@ export function ToastContainer() {
       bodyClassName="flex text-sm block p-3"
       pauseOnHover={false}
       pauseOnFocusLoss={false}
-      position="top-center"
+      position={isMobile ? 'bottom-center' : 'top-center'}
       stacked={true}
       newestOnTop={true}
       autoClose={5000}

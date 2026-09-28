@@ -47,7 +47,7 @@ export function HeaderItem({ song }: { song: ISong }) {
   return (
     <div
       className={clsx(
-        'w-full h-[250px] 2xl:h-[300px] relative',
+        'w-full h-[250px] 2xl:h-[300px] landscape:compact:h-[190px] relative',
         isFirefox && 'bg-black/60',
       )}
     >
@@ -58,7 +58,7 @@ export function HeaderItem({ song }: { song: ISong }) {
               <BlurredCanvas src={src} blur={16} className="scale-110" />
             </div>
             <div className="w-full h-full absolute z-10 bg-gradient-to-b from-transparent to-background-foreground">
-              <div className="flex h-full px-4 md:px-8 py-6 gap-4">
+              <div className="flex h-full px-4 md:px-8 py-6 compact:py-4 gap-4">
                 <div
                   className="h-full aspect-square relative group bg-skeleton rounded-lg"
                   data-testid="header-image-container"
@@ -72,9 +72,11 @@ export function HeaderItem({ song }: { song: ISong }) {
                     className="aspect-square rounded-lg object-cover bg-center absolute inset-0 z-0"
                     data-testid="header-image"
                   />
-                  <div className="w-full h-full flex items-center justify-center rounded-lg bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-colors duration-300 absolute inset-0 z-10">
+                  {/* Touch screens cannot hover to reveal the play button,
+                      so it sits visibly in the corner there. */}
+                  <div className="w-full h-full flex items-center justify-center rounded-lg bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-colors duration-300 absolute inset-0 z-10 [@media(hover:none)]:items-end [@media(hover:none)]:justify-end [@media(hover:none)]:p-2 [@media(hover:none)]:bg-transparent">
                     <Button
-                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full w-14 h-14"
+                      className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-full w-14 h-14 [@media(hover:none)]:opacity-100 [@media(hover:none)]:size-10 [@media(hover:none)]:shadow-lg"
                       variant="outline"
                       onClick={handlePlayButton}
                       data-testid={dataTestId}
@@ -101,7 +103,7 @@ export function HeaderItem({ song }: { song: ISong }) {
                     >
                       <h1
                         data-testid="header-title"
-                        className="w-full scroll-m-20 text-3xl 2xl:text-4xl font-bold tracking-tight mb-0 2xl:mb-1 hover:underline"
+                        className="w-full scroll-m-20 text-3xl 2xl:text-4xl compact:text-2xl compact:line-clamp-2 font-bold tracking-tight mb-0 2xl:mb-1 hover:underline"
                       >
                         {song.title}
                       </h1>
@@ -127,7 +129,7 @@ export function HeaderItem({ song }: { song: ISong }) {
                       </h4>
                     </Link>
                   )}
-                  <div className="flex gap-2 mt-1 2xl:mt-2">
+                  <div className="flex flex-wrap gap-2 mt-1 2xl:mt-2">
                     {song.genre !== undefined && (
                       <Link
                         to={ROUTES.ALBUMS.GENRE(song.genre)}
