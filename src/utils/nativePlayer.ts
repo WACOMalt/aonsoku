@@ -32,7 +32,7 @@ interface NativePlayerPlugin {
   load(options: {
     previous?: NativeItem
     current: NativeItem
-    next?: NativeItem
+    upcoming: NativeItem[]
     positionMs: number
     playWhenReady: boolean
     repeatOne: boolean
@@ -40,7 +40,7 @@ interface NativePlayerPlugin {
   }): Promise<void>
   setAdjacent(options: {
     previous?: NativeItem
-    next?: NativeItem
+    upcoming: NativeItem[]
   }): Promise<void>
   skipTo(options: { key: string }): Promise<{ skipped: boolean }>
   setPlaying(options: { playing: boolean }): Promise<void>
@@ -48,6 +48,7 @@ interface NativePlayerPlugin {
   setVolume(options: { volume: number }): Promise<void>
   setRepeatOne(options: { enabled: boolean }): Promise<void>
   stop(): Promise<void>
+  setKeepAwake(options: { enabled: boolean }): Promise<void>
   getState(): Promise<NativeProgress>
 
   addListener(

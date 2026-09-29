@@ -75,6 +75,10 @@ public class MediaPlaybackService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // Started with startForegroundService(): show the notification at
+        // once, whatever happens next, or Android kills the app when its
+        // deadline passes.
+        updateNotification();
         MediaButtonReceiver.handleIntent(mediaSession, intent);
         return START_STICKY;
     }

@@ -20,6 +20,7 @@ import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.session.MediaController;
 import androidx.media3.session.SessionToken;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -33,12 +34,13 @@ import java.util.List;
 /**
  * Lets the web app play songs through ExoPlayer (see PlaybackEngine).
  *
- * The web app keeps the queue. The player holds the current track with the
- * one before and the one after it: it preloads the next and joins onto it
- * without a gap, and the notification and headset buttons can move to
- * either without waiting for the web app, which may be asleep in the
- * background. Whenever the player moves, the web app is told, moves its
- * queue to match and sends the new neighbours. Every item carries a key from
+ * The web app keeps the queue. The player holds the current track, the one
+ * before it and a stretch of the queue after it: it preloads the next and
+ * joins onto it without a gap, the notification and headset buttons can
+ * move without waiting for the web app, and if the web app stalls in the
+ * background, playback goes on through what is held. Whenever the player
+ * moves, the web app is told, moves its queue to match and brings the held
+ * tracks up to date. Every item carries a key from
  * the web app so events can be matched to the item they are about.
  *
  * Events: "progress" (position), "transition" (a new item started),
@@ -93,6 +95,7 @@ public class NativePlayerPlugin extends Plugin {
 
         @Override
         public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+            updateAwake();
             DebugLog.i(TAG, "playWhenReady " + playWhenReady + " reason " + reason
                 + (playWhenReady == requestedPlaying ? " (requested)" : " (from outside)"));
             if (playWhenReady == requestedPlaying) return;
@@ -105,6 +108,7 @@ public class NativePlayerPlugin extends Plugin {
 
         @Override
         public void onIsPlayingChanged(boolean isPlaying) {
+            updateAwake();
             main.removeCallbacks(progressTick);
             if (isPlaying) {
                 main.post(progressTick);
@@ -115,6 +119,7 @@ public class NativePlayerPlugin extends Plugin {
 
         @Override
         public void onPlaybackStateChanged(int state) {
+            updateAwake();
             emitProgress();
             if (state == Player.STATE_ENDED) {
                 JSObject data = new JSObject();
@@ -170,8 +175,8 @@ public class NativePlayerPlugin extends Plugin {
     }
 
     /**
-     * Starts a track: { previous?, current, next?, positionMs, playWhenReady,
-     * repeatOne, volume }. Items are { key, url, title, artist, album,
+     * Starts a track: { previous?, current, upcoming[], positionMs,
+     * playWhenReady, repeatOne, volume }. Items are { key, url, title, artist, album,
      * artworkUrl, durationMs, gain }.
      */
     @PluginMethod
@@ -182,7 +187,7 @@ public class NativePlayerPlugin extends Plugin {
             return;
         }
         JSObject previous = call.getObject("previous");
-        JSObject next = call.getObject("next");
+        List<JSObject> upcoming = objects(call, "upcoming");
         long positionMs = Math.max(0, call.getDouble("positionMs", 0.0).longValue());
         boolean playWhenReady = Boolean.TRUE.equals(call.getBoolean("playWhenReady", false));
         boolean repeatOne = Boolean.TRUE.equals(call.getBoolean("repeatOne", false));
@@ -195,7 +200,7 @@ public class NativePlayerPlugin extends Plugin {
             List<MediaItem> items = new ArrayList<>();
             if (previous != null) items.add(toMediaItem(previous));
             items.add(toMediaItem(current));
-            if (next != null) items.add(toMediaItem(next));
+            for (JSObject item : upcoming) items.add(toMediaItem(item));
             volume = newVolume;
             requestedPlaying = playWhenReady;
             p.setRepeatMode(repeatOne ? Player.REPEAT_MODE_ONE : Player.REPEAT_MODE_OFF);
@@ -208,14 +213,14 @@ public class NativePlayerPlugin extends Plugin {
     }
 
     /**
-     * Sets the tracks either side of the current one: { previous?, next? }.
-     * A side whose key is already in place is left alone, so a preloaded
-     * next track keeps its buffered audio.
+     * Sets the tracks around the current one: { previous?, upcoming[] }.
+     * Tracks already held in the same order (by key) are left alone, so a
+     * preloaded next track keeps its buffered audio.
      */
     @PluginMethod
     public void setAdjacent(PluginCall call) {
         JSObject previous = call.getObject("previous");
-        JSObject next = call.getObject("next");
+        List<JSObject> upcoming = objects(call, "upcoming");
         main.post(() -> {
             if (player == null || player.getMediaItemCount() == 0) {
                 call.resolve();
@@ -223,13 +228,16 @@ public class NativePlayerPlugin extends Plugin {
             }
             int index = player.getCurrentMediaItemIndex();
             int count = player.getMediaItemCount();
-            if (next != null && index + 1 < count
-                && player.getMediaItemAt(index + 1).mediaId.equals(next.getString("key"))) {
-                if (count > index + 2) player.removeMediaItems(index + 2, count);
-            } else {
-                if (count > index + 1) player.removeMediaItems(index + 1, count);
-                if (next != null) player.addMediaItem(toMediaItem(next));
+            int kept = 0;
+            while (kept < upcoming.size() && index + 1 + kept < count
+                && player.getMediaItemAt(index + 1 + kept).mediaId
+                    .equals(upcoming.get(kept).getString("key"))) {
+                kept++;
             }
+            if (count > index + 1 + kept) player.removeMediaItems(index + 1 + kept, count);
+            List<MediaItem> added = new ArrayList<>();
+            for (int i = kept; i < upcoming.size(); i++) added.add(toMediaItem(upcoming.get(i)));
+            if (!added.isEmpty()) player.addMediaItems(added);
 
             index = player.getCurrentMediaItemIndex();
             if (previous != null && index >= 1
@@ -338,8 +346,20 @@ public class NativePlayerPlugin extends Plugin {
                 player.clearMediaItems();
             }
             closeSession();
+            AonsokuWebView.setAwake("native", false);
             call.resolve();
         });
+    }
+
+    /**
+     * Keeps the page running in the background (see AonsokuWebView) for the
+     * web app's own reasons: { enabled }, e.g. while it plays radio or is in
+     * a Jam.
+     */
+    @PluginMethod
+    public void setKeepAwake(PluginCall call) {
+        AonsokuWebView.setAwake("page", Boolean.TRUE.equals(call.getBoolean("enabled", false)));
+        call.resolve();
     }
 
     @PluginMethod
@@ -370,6 +390,21 @@ public class NativePlayerPlugin extends Plugin {
         controller = null;
         Context context = getContext();
         context.stopService(new Intent(context, PlaybackService.class));
+    }
+
+    /** The objects in an array argument (missing or malformed: none). */
+    private static List<JSObject> objects(PluginCall call, String name) {
+        List<JSObject> result = new ArrayList<>();
+        JSArray array = call.getArray(name);
+        if (array == null) return result;
+        for (int i = 0; i < array.length(); i++) {
+            try {
+                result.add(JSObject.fromJSONObject(array.getJSONObject(i)));
+            } catch (org.json.JSONException e) {
+                Log.w(TAG, "Skipping a malformed " + name + " item", e);
+            }
+        }
+        return result;
     }
 
     private MediaItem toMediaItem(JSObject item) {
@@ -403,6 +438,20 @@ public class NativePlayerPlugin extends Plugin {
         }
         // The output cannot be boosted above full scale.
         player.setVolume(Math.max(0f, Math.min(1f, volume * gain)));
+    }
+
+    /**
+     * While the native player plays (or is about to), keep the page running
+     * so the queue, Jam and Connect keep up, including when play was pressed
+     * on the notification while the page was asleep.
+     */
+    private void updateAwake() {
+        boolean playing = player != null
+            && player.getPlayWhenReady()
+            && player.getMediaItemCount() > 0
+            && player.getPlaybackState() != Player.STATE_IDLE
+            && player.getPlaybackState() != Player.STATE_ENDED;
+        AonsokuWebView.setAwake("native", playing);
     }
 
     private String currentKey() {

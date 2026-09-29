@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useCanOutputAudio } from '@/store/connect.store'
+import { useJamStore } from '@/store/jam.store'
 import {
   useGaplessSettings,
   usePlayerIsPlaying,
@@ -18,7 +19,7 @@ import {
   updateAndroidRadioMediaSession,
 } from '@/utils/androidMediaSession'
 import { appName } from '@/utils/appName'
-import { usesNativeSongPlayer } from '@/utils/nativePlayer'
+import { NativePlayer, usesNativeSongPlayer } from '@/utils/nativePlayer'
 import { manageMediaSession } from '@/utils/setMediaSession'
 
 export function MediaSessionObserver() {
@@ -48,6 +49,14 @@ export function MediaSessionObserver() {
   const resetAppTitle = useCallback(() => {
     document.title = appName
   }, [])
+
+  // Keep the page running in the background while it has something to do:
+  // playing (the queue, Connect) or taking part in a Jam, whose queue others
+  // keep changing. Otherwise the phone freezes the page with the screen off.
+  const inJam = useJamStore((state) => state.id !== null)
+  useEffect(() => {
+    NativePlayer?.setKeepAwake({ enabled: Boolean(isPlaying) || inJam })
+  }, [isPlaying, inJam])
 
   // Proactively request notification permission on Android 13+ at startup
   useEffect(() => {

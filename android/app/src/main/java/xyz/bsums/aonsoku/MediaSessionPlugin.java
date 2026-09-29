@@ -44,6 +44,16 @@ public class MediaSessionPlugin extends Plugin {
         @Override
         public void onServiceConnected(ComponentName name, IBinder binder) {
             Log.d(TAG, "Service connected");
+            // Destroyed while the connection was on its way: a late callback
+            // must not start the service again.
+            if (!serviceStarted) {
+                try {
+                    getContext().unbindService(this);
+                } catch (Exception e) {
+                    Log.w(TAG, "Error unbinding late connection: " + e.getMessage());
+                }
+                return;
+            }
             MediaPlaybackService.LocalBinder localBinder = (MediaPlaybackService.LocalBinder) binder;
             service = localBinder.getService();
             serviceBound = true;
@@ -204,6 +214,12 @@ public class MediaSessionPlugin extends Plugin {
 
     private void destroyService() {
         Context context = getContext();
+
+        // A metadata update waiting for the service is dropped with it.
+        if (pendingMetadataCall != null) {
+            pendingMetadataCall.resolve();
+            pendingMetadataCall = null;
+        }
 
         if (serviceBound) {
             try {
