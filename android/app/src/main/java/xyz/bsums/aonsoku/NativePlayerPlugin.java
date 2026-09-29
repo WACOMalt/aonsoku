@@ -76,7 +76,7 @@ public class NativePlayerPlugin extends Plugin {
         @Override
         public void onMediaItemTransition(@Nullable MediaItem item, int reason) {
             if (item == null) return;
-            Log.i(TAG, "transition to " + item.mediaId + " reason " + reason);
+            DebugLog.i(TAG, "transition to " + item.mediaId + " reason " + reason);
             applyVolume();
             JSObject data = new JSObject();
             data.put("key", item.mediaId);
@@ -93,7 +93,7 @@ public class NativePlayerPlugin extends Plugin {
 
         @Override
         public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
-            Log.i(TAG, "playWhenReady " + playWhenReady + " reason " + reason
+            DebugLog.i(TAG, "playWhenReady " + playWhenReady + " reason " + reason
                 + (playWhenReady == requestedPlaying ? " (requested)" : " (from outside)"));
             if (playWhenReady == requestedPlaying) return;
             requestedPlaying = playWhenReady;
@@ -146,7 +146,7 @@ public class NativePlayerPlugin extends Plugin {
     @Override
     public void load() {
         PlaybackEngine.setCommandListener(action -> {
-            Log.i(TAG, "command to the web app: " + action);
+            DebugLog.i(TAG, "command to the web app: " + action);
             JSObject data = new JSObject();
             data.put("action", action);
             notifyListeners("command", data);
@@ -189,7 +189,7 @@ public class NativePlayerPlugin extends Plugin {
         float newVolume = call.getFloat("volume", volume);
 
         main.post(() -> {
-            Log.i(TAG, "load " + current.getString("key") + " at " + positionMs
+            DebugLog.i(TAG, "load " + current.getString("key") + " at " + positionMs
                 + (playWhenReady ? " playing" : " paused"));
             ExoPlayer p = ensurePlayer();
             List<MediaItem> items = new ArrayList<>();
@@ -269,7 +269,7 @@ public class NativePlayerPlugin extends Plugin {
                     }
                 }
             }
-            Log.i(TAG, "skip to " + key + (skipped ? "" : " missed"));
+            DebugLog.i(TAG, "skip to " + key + (skipped ? "" : " missed"));
             result.put("skipped", skipped);
             call.resolve(result);
         });
@@ -279,7 +279,7 @@ public class NativePlayerPlugin extends Plugin {
     public void setPlaying(PluginCall call) {
         boolean playing = Boolean.TRUE.equals(call.getBoolean("playing", false));
         main.post(() -> {
-            Log.i(TAG, "setPlaying " + playing);
+            DebugLog.i(TAG, "setPlaying " + playing);
             requestedPlaying = playing;
             if (player != null) {
                 if (playing && player.getPlaybackState() == Player.STATE_IDLE
@@ -330,7 +330,7 @@ public class NativePlayerPlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         main.post(() -> {
-            Log.i(TAG, "stop");
+            DebugLog.i(TAG, "stop");
             requestedPlaying = false;
             main.removeCallbacks(progressTick);
             if (player != null) {

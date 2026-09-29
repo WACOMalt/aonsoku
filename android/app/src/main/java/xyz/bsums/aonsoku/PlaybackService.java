@@ -2,7 +2,6 @@ package xyz.bsums.aonsoku;
 
 import android.app.PendingIntent;
 import android.content.Intent;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.OptIn;
@@ -47,7 +46,7 @@ public class PlaybackService extends MediaSessionService {
                 PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
         }
         session = builder.build();
-        Log.i("NativePlayer", "media session created");
+        DebugLog.i("NativePlayer", "media session created");
     }
 
     @Override
@@ -69,7 +68,7 @@ public class PlaybackService extends MediaSessionService {
 
     @Override
     public void onDestroy() {
-        Log.i("NativePlayer", "media session closed");
+        DebugLog.i("NativePlayer", "media session closed");
         if (session != null) {
             session.release();
             session = null;

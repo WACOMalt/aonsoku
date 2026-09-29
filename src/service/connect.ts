@@ -111,6 +111,25 @@ class ConnectService {
     socket.on('devices_update', (devices) => {
       // A socket that has since been replaced must not touch state.
       if (this.socket !== socket) return
+      // This device kept playing through a dropped connection (a phone can
+      // freeze the page in the background), and control was released while
+      // it was away. It is still the one playing, so it takes control back
+      // rather than turning into a remote and going quiet.
+      const wasPlayingHere =
+        useConnectStore.getState().isActivePlayer &&
+        usePlayerStore.getState().playerState.isPlaying
+      const nobodyActive = !devices.some((device) => device.isActivePlayer)
+      if (wasPlayingHere && nobodyActive) {
+        setDevices(
+          devices.map((device) =>
+            device.id === socket.id
+              ? { ...device, isActivePlayer: true }
+              : device,
+          ),
+        )
+        this.sendClaim()
+        return
+      }
       setDevices(devices)
       // Just became passive: what is shown now is the baseline that local
       // changes are compared against, until the active device reports.
@@ -219,6 +238,13 @@ class ConnectService {
     if (!this.socket?.connected) return
     const { isActivePlayer, thisDeviceId } = useConnectStore.getState()
     if (isActivePlayer || !thisDeviceId) return
+    this.sendClaim()
+  }
+
+  /** Asks the server to make this device the one that plays. */
+  private sendClaim() {
+    const thisDeviceId = this.socket?.id
+    if (!this.socket?.connected || !thisDeviceId) return
 
     const { songlist, playerState, playerProgress } = usePlayerStore.getState()
     const song = songlist.currentSong
