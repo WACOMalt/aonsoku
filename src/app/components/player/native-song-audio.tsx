@@ -341,7 +341,7 @@ export function NativeSongAudio({ audioRef }: NativeSongAudioProps) {
     restartClock(target.key, 0)
     setCurrentDuration(song.duration)
     NativePlayer.skipTo({ key: target.key }).then(({ skipped }) => {
-      if (!skipped) logger.warn('Native player skip missed', target.key)
+      if (!skipped) logger.info('Native player skip missed', target.key)
     })
   }, [song?.id])
 

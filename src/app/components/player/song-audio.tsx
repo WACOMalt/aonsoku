@@ -10,10 +10,14 @@ import {
 import { getSongStreamUrl } from '@/api/httpClient'
 import {
   crossfadeElements,
+  cutElementAt,
   resetElementFade,
 } from '@/app/hooks/use-audio-context'
 import { useAppMediaCache } from '@/store/app.store'
-import { isPassiveConnectDevice } from '@/store/connect.store'
+import {
+  isPassiveConnectDevice,
+  useCanOutputAudio,
+} from '@/store/connect.store'
 import {
   getVolume,
   useGaplessSettings,
@@ -27,8 +31,14 @@ import {
 import { LoopState } from '@/types/playerContext'
 import { ISong } from '@/types/responses/song'
 import { ensureSupportForAlac } from '@/utils/alac'
-import { ReplayGainParams, replayGainParamsFor } from '@/utils/replayGain'
+import { logger } from '@/utils/logger'
+import {
+  calculateReplayGain,
+  ReplayGainParams,
+  replayGainParamsFor,
+} from '@/utils/replayGain'
 import { AudioPlayer } from './audio'
+import { BufferLane } from './buffer-lane'
 
 /**
  * How long before a track ends the next one is started, to cover the time
@@ -95,6 +105,28 @@ async function measureStart(element: HTMLAudioElement) {
 /** Only start early when the stream length agrees with the track's. */
 const DURATION_TOLERANCE_SECONDS = 2
 
+/**
+ * How long before the end of an element-played track its position is
+ * located, to join the next track onto it on the audio clock.
+ */
+const LANE_JOIN_WINDOW_SECONDS = 8
+const LANE_JOIN_ATTEMPTS = 3
+
+/** Decoded tracks take a lot of memory; only desktop-class devices use them. */
+function hasFinePointer() {
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(pointer: fine)').matches === true
+  )
+}
+
+type LaneJoin = {
+  trackId: string
+  state: 'measuring' | 'scheduled' | 'failed'
+  attempts: number
+  element?: HTMLAudioElement
+}
+
 type Slot = { song: ISong; url: string }
 type SlotIndex = 0 | 1
 
@@ -108,10 +140,17 @@ interface SongAudioProps {
 }
 
 /**
- * Song playback with gapless transitions. Two audio elements take turns:
- * while one plays, the other loads the next track, and just before the
- * current one ends the next one starts, so there is no silence to load it.
- * With gapless off, or for repeat-one, only one element is used.
+ * Song playback with gapless transitions.
+ *
+ * On desktop-class devices tracks join on the exact sample: the next track
+ * is decoded ahead and played from memory on the audio clock (the "lane",
+ * see BufferLane), scheduled to start where the one before it ends.
+ *
+ * Otherwise, and whenever the lane cannot be used (a track too long to
+ * decode, a failed download), two audio elements take turns: while one
+ * plays, the other loads the next track, and just before the current one
+ * ends the next one starts with a short crossfade. With gapless off only
+ * one element is used.
  */
 export function SongAudio({ audioRef }: SongAudioProps) {
   const { currentList, currentSongIndex } = usePlayerSonglist()
@@ -119,8 +158,14 @@ export function SongAudio({ audioRef }: SongAudioProps) {
   const loopState = usePlayerLoop()
   const { enabled: gaplessEnabled } = useGaplessSettings()
   const mediaCacheEnabled = useAppMediaCache()
-  const { replayGainType, replayGainPreAmp, replayGainDefaultGain } =
-    useReplayGainState()
+  const {
+    replayGainEnabled,
+    replayGainError,
+    replayGainType,
+    replayGainPreAmp,
+    replayGainDefaultGain,
+  } = useReplayGainState()
+  const canOutputAudio = useCanOutputAudio()
   const {
     setAudioPlayerRef,
     setCurrentDuration,
@@ -128,6 +173,7 @@ export function SongAudio({ audioRef }: SongAudioProps) {
     setPlayingState,
     handleSongEnded,
     getCurrentProgress,
+    playNextSong,
   } = usePlayerActions()
 
   const firstSlot = useRef<HTMLAudioElement>(null)
@@ -149,9 +195,39 @@ export function SongAudio({ audioRef }: SongAudioProps) {
   const useStandby =
     gaplessEnabled && !standbyBlocked && loopState !== LoopState.One
 
+  const laneAllowed =
+    gaplessEnabled &&
+    !replayGainError &&
+    BufferLane.isSupported() &&
+    hasFinePointer()
+  const laneRef = useRef<BufferLane | null>(null)
+  // The current track plays on the lane rather than an element.
+  const [onLane, setOnLaneState] = useState(false)
+  const onLaneRef = useRef(false)
+  // Bumped when a track finishes decoding, to act on it.
+  const [decodeTick, setDecodeTick] = useState(0)
+  const laneTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const laneJoin = useRef<LaneJoin | null>(null)
+
   // Latest values for event handlers and timers.
-  const live = useRef({ active, slots, song, nextSong, useStandby, isPlaying })
-  live.current = { active, slots, song, nextSong, useStandby, isPlaying }
+  const live = useRef({
+    active,
+    slots,
+    song,
+    nextSong,
+    useStandby,
+    isPlaying,
+    loopState,
+  })
+  live.current = {
+    active,
+    slots,
+    song,
+    nextSong,
+    useStandby,
+    isPlaying,
+    loopState,
+  }
 
   const makeSlot = useCallback(
     (track: ISong): Slot => ({
@@ -170,6 +246,220 @@ export function SongAudio({ audioRef }: SongAudioProps) {
     if (handoffTimer.current) clearTimeout(handoffTimer.current)
     handoffTimer.current = null
   }, [])
+
+  const laneGain = useCallback(
+    (track: ISong) => {
+      if (!replayGainEnabled) return 1
+      const gain = calculateReplayGain(
+        replayGainParamsFor(track, {
+          type: replayGainType,
+          preAmp: replayGainPreAmp,
+          defaultGain: replayGainDefaultGain,
+        }),
+      )
+      return Number.isFinite(gain) && gain > 0 ? gain : 1
+    },
+    [
+      replayGainEnabled,
+      replayGainType,
+      replayGainPreAmp,
+      replayGainDefaultGain,
+    ],
+  )
+
+  const getLane = useCallback(() => {
+    if (!laneAllowed) return null
+    if (!laneRef.current) {
+      laneRef.current = new BufferLane()
+      laneRef.current.setVolume(getVolume() / 100)
+    }
+    return laneRef.current
+  }, [laneAllowed])
+
+  const clearLaneTimer = useCallback(() => {
+    if (laneTimer.current) clearTimeout(laneTimer.current)
+    laneTimer.current = null
+  }, [])
+
+  const setOnLane = useCallback((value: boolean) => {
+    onLaneRef.current = value
+    setOnLaneState(value)
+  }, [])
+
+  // A join onto the lane scheduled from an element that is no longer
+  // going to happen (paused, sought, the next track changed).
+  const cancelLaneJoin = useCallback(() => {
+    const join = laneJoin.current
+    laneJoin.current = null
+    if (!join || join.state !== 'scheduled') return
+    clearLaneTimer()
+    const lane = laneRef.current
+    if (lane?.next) {
+      lane.stop(lane.next)
+      lane.next = null
+    }
+    if (join.element) resetElementFade(join.element)
+  }, [clearLaneTimer])
+
+  const pauseElements = useCallback(() => {
+    for (const ref of slotRefs) ref.current?.pause()
+  }, [slotRefs])
+
+  // Plays a decoded track on the lane now, from `offset` seconds.
+  const startOnLane = useCallback(
+    (track: ISong, offset: number) => {
+      const lane = laneRef.current
+      if (!lane) return false
+      cancelLaneJoin()
+      clearLaneTimer()
+      lane.stopAll()
+      const voice = lane.start(
+        track.id,
+        lane.context.currentTime + 0.02,
+        offset,
+        laneGain(track),
+      )
+      if (!voice) return false
+      lane.current = voice
+      lane.setVolume(getVolume() / 100)
+      pauseElements()
+      setOnLane(true)
+      setCurrentDuration(Math.floor(voice.buffer.duration))
+      setProgress(Math.floor(offset))
+      return true
+    },
+    [
+      cancelLaneJoin,
+      clearLaneTimer,
+      laneGain,
+      pauseElements,
+      setCurrentDuration,
+      setOnLane,
+      setProgress,
+    ],
+  )
+
+  // The lane moved on to its next track (at the join, on the audio clock);
+  // the queue follows.
+  const advanceLane = useCallback(
+    (fromTrackId: string) => {
+      const lane = laneRef.current
+      if (!lane?.next) return
+      lane.current = lane.next
+      lane.next = null
+      laneJoin.current = null
+      if (laneTimer.current) clearTimeout(laneTimer.current)
+      laneTimer.current = null
+      lane.setVolume(getVolume() / 100)
+      setOnLane(true)
+      const { currentList: list, currentSongIndex: at } =
+        usePlayerStore.getState().songlist
+      if (list[at]?.id === fromTrackId) playNextSong()
+    },
+    [playNextSong, setOnLane],
+  )
+
+  // On the lane: schedule the next track to start on the exact sample the
+  // current one ends, or plan what happens at its end otherwise.
+  const scheduleLaneNext = useCallback(() => {
+    const lane = laneRef.current
+    const current = lane?.current
+    const { song: track, nextSong: next, loopState: loop } = live.current
+    clearLaneTimer()
+    if (!lane || !current || !track || current.key !== track.id) return
+    if (!live.current.isPlaying) return
+
+    lane.setLoop(current, loop === LoopState.One)
+    if (loop === LoopState.One) return
+
+    if (lane.next && lane.next.key !== next?.id) {
+      lane.stop(lane.next)
+      lane.next = null
+    }
+    const end = lane.endTime(current)
+    if (!lane.next && next && lane.buffer(next.id)) {
+      lane.next = lane.start(next.id, end, 0, laneGain(next))
+    }
+
+    const untilEnd = Math.max(0, (end - lane.context.currentTime) * 1000)
+    if (lane.next) {
+      laneTimer.current = setTimeout(() => advanceLane(track.id), untilEnd)
+      return
+    }
+
+    const standby = slotRefs[other(live.current.active)].current
+    const standbyReady =
+      next &&
+      live.current.slots[other(live.current.active)]?.song.id === next.id &&
+      standby &&
+      standby.readyState >= 3
+    if (standbyReady) {
+      // The next track could not be decoded: hand over to its element,
+      // started a moment early to cover its start-up time.
+      laneTimer.current = setTimeout(
+        () => {
+          laneTimer.current = null
+          setOnLane(false)
+          playNextSong()
+        },
+        Math.max(0, untilEnd - handoffLead * 1000),
+      )
+      return
+    }
+
+    // Nothing ready to follow: the track ends, as with an element.
+    laneTimer.current = setTimeout(() => {
+      laneTimer.current = null
+      const endedId = track.id
+      handleSongEnded()
+      const state = usePlayerStore.getState()
+      const { currentList: list, currentSongIndex: at } = state.songlist
+      // Repeating a one-track queue comes back to the same track.
+      if (state.playerState.isPlaying && list[at]?.id === endedId) {
+        startOnLane(list[at], 0)
+      }
+    }, untilEnd + 50)
+  }, [
+    advanceLane,
+    clearLaneTimer,
+    handleSongEnded,
+    laneGain,
+    playNextSong,
+    setOnLane,
+    slotRefs,
+    startOnLane,
+  ])
+
+  // Seeking on the lane restarts the track at the new position.
+  const seekLane = useCallback(
+    (seconds: number) => {
+      const lane = laneRef.current
+      const current = lane?.current
+      if (!lane || !current) return
+      const offset = Math.min(
+        Math.max(0, seconds),
+        Math.max(0, current.buffer.duration - 0.05),
+      )
+      lane.stop(current)
+      lane.stop(lane.next)
+      lane.next = null
+      lane.current = lane.start(
+        current.key,
+        lane.context.currentTime + 0.01,
+        offset,
+        current.gain.gain.value,
+      )
+      scheduleLaneNext()
+    },
+    [scheduleLaneNext],
+  )
+  const seekLaneRef = useRef(seekLane)
+  seekLaneRef.current = seekLane
+
+  const laneShim = useMemo(
+    () => createLaneShim(laneRef, (seconds) => seekLaneRef.current(seconds)),
+    [],
+  )
 
   // Keep the shared reference (seeking, sync, media controls) on the slot
   // that is playing.
@@ -192,6 +482,30 @@ export function SongAudio({ audioRef }: SongAudioProps) {
   useEffect(() => {
     cancelHandoff()
     if (!song) return
+
+    const lane = laneRef.current
+    // Joined onto the lane at the end of the last track: already playing.
+    if (onLaneRef.current && lane?.current?.key === song.id) return
+    // The listener moved on to a track the lane has decoded: play it at
+    // once, from memory.
+    if (lane && canOutputAudio && lane.buffer(song.id)) {
+      if (startOnLane(song, getCurrentProgress())) return
+    }
+    // Leaving the lane for an element.
+    if (lane && (onLaneRef.current || laneJoin.current)) {
+      cancelLaneJoin()
+      clearLaneTimer()
+      const current = lane.current
+      // A handover at the end lets the lane's last moment play out.
+      if (!current || lane.endTime(current) - lane.context.currentTime > 0.5) {
+        lane.stopAll()
+      } else {
+        lane.stop(lane.next)
+        lane.current = null
+        lane.next = null
+      }
+      setOnLane(false)
+    }
 
     const { active: current, slots: currentSlots } = live.current
     if (currentSlots[current]?.song.id === song.id) return
@@ -230,17 +544,38 @@ export function SongAudio({ audioRef }: SongAudioProps) {
   // Point the shared reference at the active slot once it is rendered (its
   // element only exists once the slot has a track).
   const activeUrl = slots[active]?.url
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-pointed when the track changes
   useEffect(() => {
+    if (onLane) {
+      audioRef.current = laneShim
+      if (usePlayerStore.getState().playerState.audioPlayerRef !== laneShim) {
+        setAudioPlayerRef(laneShim)
+      }
+      return
+    }
     if (activeUrl) pointAt(active)
-  }, [active, activeUrl, pointAt])
+  }, [
+    active,
+    activeUrl,
+    audioRef,
+    laneShim,
+    onLane,
+    pointAt,
+    setAudioPlayerRef,
+    song?.id,
+  ])
 
   // Preload the next track into the standby slot.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: decodeTick re-checks once decoding ends
   useEffect(() => {
     const standby = other(active)
     if (!useStandby || !nextSong || nextSong.id === song?.id) return
+    // On the lane an element is only needed when the next track could not
+    // be decoded.
+    if (onLane && laneRef.current?.buffer(nextSong.id) !== null) return
     // Wait until the switch to the current track has happened; until then
     // the "standby" slot may be the one about to become active.
-    if (slots[active]?.song.id !== song?.id) return
+    if (!onLane && slots[active]?.song.id !== song?.id) return
     if (slots[standby]?.song.id === nextSong.id) return
 
     const assign = () =>
@@ -258,18 +593,108 @@ export function SongAudio({ audioRef }: SongAudioProps) {
       return () => clearTimeout(timer)
     }
     assign()
-  }, [active, nextSong, useStandby, song?.id, slots, makeSlot, slotRefs])
+    return undefined
+  }, [
+    active,
+    nextSong,
+    useStandby,
+    song?.id,
+    slots,
+    makeSlot,
+    slotRefs,
+    onLane,
+    decodeTick,
+  ])
 
   // Pausing stops both elements, including a tail still finishing.
   useEffect(() => {
     if (isPlaying) return
     cancelHandoff()
+    cancelLaneJoin()
     for (const ref of slotRefs) ref.current?.pause()
-  }, [isPlaying, cancelHandoff, slotRefs])
+  }, [isPlaying, cancelHandoff, cancelLaneJoin, slotRefs])
 
   useEffect(() => cancelHandoff, [cancelHandoff])
 
-  const isActive = (index: SlotIndex) => live.current.active === index
+  // Decode the next track ahead for the lane, and the current one while it
+  // plays on an element (to locate the element and join onto it).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the tracks
+  useEffect(() => {
+    const lane = getLane()
+    if (!lane || !song) return
+    const bump = () => setDecodeTick((tick) => tick + 1)
+    const keys = [song.id]
+    if (!onLane) {
+      lane.prepare(song.id, makeSlot(song).url, song.duration).then(bump)
+    }
+    if (nextSong && loopState !== LoopState.One) {
+      keys.push(nextSong.id)
+      lane
+        .prepare(nextSong.id, makeSlot(nextSong).url, nextSong.duration)
+        .then(bump)
+    }
+    lane.keepOnly(keys)
+  }, [song?.id, nextSong?.id, onLane, loopState, getLane])
+
+  // The next track changed while a join onto it was scheduled.
+  useEffect(() => {
+    const join = laneJoin.current
+    if (!join || join.state !== 'scheduled') return
+    if (laneRef.current?.next?.key !== nextSong?.id) cancelLaneJoin()
+  }, [nextSong?.id, cancelLaneJoin])
+
+  // On the lane: keep the next track scheduled, and play or pause the lane
+  // (by running or suspending the audio clock, which keeps its schedule).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the lane state
+  useEffect(() => {
+    const lane = laneRef.current
+    if (!onLane || !lane) return
+    if (isPlaying && canOutputAudio) {
+      lane.context.resume().then(() => scheduleLaneNext())
+    } else {
+      clearLaneTimer()
+      lane.context.suspend()
+    }
+  }, [
+    onLane,
+    isPlaying,
+    canOutputAudio,
+    song?.id,
+    nextSong?.id,
+    decodeTick,
+    loopState,
+  ])
+
+  // On the lane, the position comes from the audio clock.
+  useEffect(() => {
+    if (!onLane) return
+    const timer = setInterval(() => {
+      const lane = laneRef.current
+      if (lane?.current) setProgress(Math.floor(lane.position(lane.current)))
+    }, 250)
+    return () => clearInterval(timer)
+  }, [onLane, setProgress])
+
+  // A passive Connect device plays nothing: leave the lane.
+  useEffect(() => {
+    if (canOutputAudio || !onLaneRef.current) return
+    clearLaneTimer()
+    laneRef.current?.stopAll()
+    setOnLane(false)
+  }, [canOutputAudio, clearLaneTimer, setOnLane])
+
+  // The lane stops with the player.
+  useEffect(
+    () => () => {
+      if (laneTimer.current) clearTimeout(laneTimer.current)
+      laneRef.current?.stopAll()
+      laneRef.current?.keepOnly([])
+    },
+    [],
+  )
+
+  const isActive = (index: SlotIndex) =>
+    !onLaneRef.current && live.current.active === index
 
   function handleLoadedMetadata(index: SlotIndex, element: HTMLAudioElement) {
     if (!isActive(index)) return
@@ -286,13 +711,78 @@ export function SongAudio({ audioRef }: SongAudioProps) {
   function handleTimeUpdate(index: SlotIndex, element: HTMLAudioElement) {
     if (!isActive(index)) return
     setProgress(Math.floor(element.currentTime))
+    joinLaneFromElement(element)
     scheduleHandoff(index, element)
+  }
+
+  // Near the end of an element-played track, find exactly where the
+  // element is on the audio clock and schedule the next track on the lane
+  // to start on the sample where this one ends.
+  function joinLaneFromElement(element: HTMLAudioElement) {
+    const lane = laneRef.current
+    const { song: track, nextSong: next } = live.current
+    if (!lane || !track || !next || !live.current.isPlaying) return
+    if (!canOutputAudio || isPassiveConnectDevice()) return
+    const join = laneJoin.current
+    if (join && join.trackId === track.id && join.state !== 'failed') return
+    if (join?.trackId === track.id && join.attempts >= LANE_JOIN_ATTEMPTS) {
+      return
+    }
+    const buffer = lane.buffer(track.id)
+    if (!buffer || !lane.buffer(next.id)) return
+    const remaining = element.duration - element.currentTime
+    if (!(remaining <= LANE_JOIN_WINDOW_SECONDS && remaining > 2)) return
+
+    const attempts = join?.trackId === track.id ? join.attempts + 1 : 1
+    laneJoin.current = { trackId: track.id, state: 'measuring', attempts }
+    lane.locateElement(element, track.id).then((clock) => {
+      if (laneJoin.current?.trackId !== track.id) return
+      const unchanged =
+        live.current.song?.id === track.id &&
+        live.current.nextSong?.id === next.id &&
+        live.current.isPlaying &&
+        !element.paused &&
+        !element.seeking
+      const end = clock
+        ? (clock.frame + buffer.length - clock.position) /
+          lane.context.sampleRate
+        : 0
+      if (!clock || !unchanged || end - lane.context.currentTime < 0.2) {
+        laneJoin.current = { trackId: track.id, state: 'failed', attempts }
+        return
+      }
+      const voice = lane.start(next.id, end, 0, laneGain(next))
+      if (!voice) {
+        laneJoin.current = { trackId: track.id, state: 'failed', attempts }
+        return
+      }
+      lane.next = voice
+      cutElementAt(element, end)
+      laneJoin.current = {
+        trackId: track.id,
+        state: 'scheduled',
+        attempts,
+        element,
+      }
+      logger.info('[Gapless] Next track scheduled on the sample', {
+        track: track.id,
+        startsIn: (end - lane.context.currentTime).toFixed(3),
+      })
+      clearLaneTimer()
+      laneTimer.current = setTimeout(
+        () => advanceLane(track.id),
+        Math.max(0, (end - lane.context.currentTime) * 1000),
+      )
+    })
   }
 
   // Near the end of the track, start the next one from the standby slot.
   function scheduleHandoff(index: SlotIndex, element: HTMLAudioElement) {
     const { slots: currentSlots, song: track, nextSong: next } = live.current
     if (handoffTimer.current || !live.current.useStandby) return
+    // Joining on the exact sample instead (see joinLaneFromElement).
+    const join = laneJoin.current
+    if (join?.trackId === track?.id && join?.state !== 'failed') return
     if (!track || !next || !live.current.isPlaying) return
     if (isPassiveConnectDevice()) return
 
@@ -339,6 +829,22 @@ export function SongAudio({ audioRef }: SongAudioProps) {
       },
       Math.max(0, (remaining - handoffLead) * 1000),
     )
+  }
+
+  // The element reached its end. With a join onto the lane scheduled, the
+  // lane has already taken over on the audio clock; this may come before
+  // the join's timer (timers run late in a background tab), so it moves the
+  // queue on the same way rather than ending the track.
+  function handleElementEnded(index: SlotIndex) {
+    const join = laneJoin.current
+    if (
+      join?.state === 'scheduled' &&
+      join.element === slotRefs[index].current
+    ) {
+      advanceLane(join.trackId)
+      return
+    }
+    handleSongEnded()
   }
 
   // Once the new track is audible, silence the one it took over from: at
@@ -401,7 +907,7 @@ export function SongAudio({ audioRef }: SongAudioProps) {
         return (
           <AudioPlayer
             key={index}
-            active={slotIsActive}
+            active={slotIsActive && !onLane}
             audioRef={slotRefs[index]}
             replayGain={replayGainFor(slot.song)}
             src={slot.url}
@@ -409,8 +915,13 @@ export function SongAudio({ audioRef }: SongAudioProps) {
             autoPlay={isPlaying}
             loop={slotIsActive && loopState === LoopState.One}
             onPlay={() => setPlayingState(true)}
-            onPause={() => setPlayingState(false)}
-            onEnded={handleSongEnded}
+            onPause={(event: SyntheticEvent<HTMLAudioElement>) => {
+              // Reaching the end also pauses the element; what happens then
+              // is up to the end of the track (the next one, or stopping),
+              // and must not cancel a join onto the lane.
+              if (!event.currentTarget.ended) setPlayingState(false)
+            }}
+            onEnded={() => handleElementEnded(index)}
             onPlaying={() => handlePlaying(index)}
             onPlayBlocked={
               standbyBlocked ? undefined : () => handlePlayBlocked(index)
@@ -421,6 +932,9 @@ export function SongAudio({ audioRef }: SongAudioProps) {
             onTimeUpdate={(event: SyntheticEvent<HTMLAudioElement>) =>
               handleTimeUpdate(index, event.currentTarget)
             }
+            onSeeking={() => {
+              if (isActive(index)) cancelLaneJoin()
+            }}
             onLoadStart={(event: SyntheticEvent<HTMLAudioElement>) => {
               event.currentTarget.volume = getVolume() / 100
             }}
@@ -444,4 +958,45 @@ export function getNextSong(
   if (index + 1 < list.length) return list[index + 1]
   if (loopState === LoopState.All && list.length > 1) return list[0]
   return undefined
+}
+
+/**
+ * Stands in for an audio element while the lane plays, wherever the app
+ * reads or sets the position (seek bars, lyrics, Jam and Connect sync) and
+ * the volume.
+ */
+function createLaneShim(
+  laneRef: MutableRefObject<BufferLane | null>,
+  seek: (seconds: number) => void,
+) {
+  const shim = {
+    get currentTime() {
+      const lane = laneRef.current
+      return lane?.current ? lane.position(lane.current) : 0
+    },
+    set currentTime(seconds: number) {
+      if (Number.isFinite(seconds)) seek(seconds)
+    },
+    get duration() {
+      return laneRef.current?.current?.buffer.duration ?? Number.NaN
+    },
+    get paused() {
+      return !usePlayerStore.getState().playerState.isPlaying
+    },
+    get volume() {
+      return getVolume() / 100
+    },
+    set volume(value: number) {
+      laneRef.current?.setVolume(value)
+    },
+    playbackRate: 1,
+    play() {
+      usePlayerStore.getState().actions.setPlayingState(true)
+      return Promise.resolve()
+    },
+    pause() {
+      usePlayerStore.getState().actions.setPlayingState(false)
+    },
+  }
+  return shim as unknown as HTMLAudioElement
 }

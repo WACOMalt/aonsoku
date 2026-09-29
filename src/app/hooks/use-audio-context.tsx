@@ -17,7 +17,7 @@ type IAudioSource = IMediaElementAudioSourceNode<IAudioContext>
 // is already running, so the next track's samples go straight out.
 let sharedContext: IAudioContext | null = null
 
-function getSharedAudioContext() {
+export function getSharedAudioContext() {
   if (!sharedContext || sharedContext.state === 'closed') {
     // The default (interactive) latency keeps output buffers small; the next
     // track can only start on a buffer boundary, so large ones add jitter.
@@ -74,6 +74,23 @@ export function crossfadeElements(
   fadeIn.gain.setValueAtTime(0, now)
   fadeIn.gain.setValueAtTime(0, start)
   fadeIn.gain.linearRampToValueAtTime(1, end)
+}
+
+/** The element's source node, if it is routed through the shared context. */
+export function getElementSource(element: HTMLMediaElement) {
+  return sourceNodes.get(element)
+}
+
+/**
+ * Silences the element from context time `at` on: it ends exactly where the
+ * next track, scheduled on the same clock, begins.
+ */
+export function cutElementAt(element: HTMLMediaElement, at: number) {
+  const fade = fadeNodes.get(element)
+  if (!sharedContext || !fade) return
+  fade.gain.cancelScheduledValues(sharedContext.currentTime)
+  fade.gain.setValueAtTime(1, sharedContext.currentTime)
+  fade.gain.setValueAtTime(0, at)
 }
 
 /** Full level at once (a skip, or anything that is not a handoff). */
