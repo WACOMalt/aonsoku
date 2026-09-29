@@ -6,21 +6,9 @@
     <img src="./resources/icons/icon.png" alt="Aonsoku" width="80" height="80">
   </a>
 
-  <h3 align="center">Aonsoku</h3>
+  <h3 align="center">Aonsoku-BS</h3>
   <p align="center">
     A modern desktop client for Navidrome/Subsonic servers built with React and Electron.
-    <br />
-    <br />
-    <a href="https://aonsoku.vercel.app">Web App</a>
-    ·
-    <a href="https://github.com/victoralvesf/aonsoku/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
-    ·
-    <a href="https://github.com/victoralvesf/aonsoku/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
-  </p>
-
-  [![React][React.js]][React-url] [![Electron][Electron]][Electron-url]
-
-  [![Download][Download-badge]][Download-url] [![Flathub][Flathub-badge]][Flathub-url]
 </div>
 
 <!-- TABLE OF CONTENTS -->
