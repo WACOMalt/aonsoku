@@ -126,7 +126,7 @@ Follow the prompts and choose **GitHub.com → HTTPS → Login with a web browse
 ### 2.1 Clone the repository
 
 ```bash
-git clone https://github.com/WACOMalt/aonsoku.git
+git clone https://github.com/WACOMalt/aonsoku-bs.git
 cd aonsoku
 ```
 
@@ -247,7 +247,7 @@ The v0.15.0 release must already exist on GitHub (created by the Windows/macOS C
 gh auth status
 ```
 
-You must be authenticated as a user with write access to `WACOMalt/aonsoku`.
+You must be authenticated as a user with write access to `WACOMalt/aonsoku-bs`.
 
 ### 5.2 Upload all Linux artifacts
 
@@ -256,7 +256,7 @@ gh release upload v0.15.0 \
   dist/Aonsoku-v0.15.0-linux-*.AppImage \
   dist/Aonsoku-v0.15.0-linux-*.tar.gz \
   dist/Aonsoku-v0.15.0-linux-*.deb \
-  --repo WACOMalt/aonsoku
+  --repo WACOMalt/aonsoku-bs
 ```
 
 > **Note:** Shell glob expansion (`*`) will only match files that actually exist. If arm64 builds were skipped, only the x64 AppImage and tar.gz will be uploaded — that is fine.
@@ -264,7 +264,7 @@ gh release upload v0.15.0 \
 ### 5.3 Verify the upload
 
 ```bash
-gh release view v0.15.0 --repo WACOMalt/aonsoku
+gh release view v0.15.0 --repo WACOMalt/aonsoku-bs
 ```
 
 The Linux assets should appear in the `Assets` section of the output.
@@ -386,7 +386,7 @@ release not found
 **Fix:** Confirm the release exists and you are targeting the correct repo:
 
 ```bash
-gh release list --repo WACOMalt/aonsoku
+gh release list --repo WACOMalt/aonsoku-bs
 ```
 
 If `v0.15.0` is not listed, the release must be created first (this is normally done by the Windows CI workflow).
@@ -431,7 +431,7 @@ nvm install 22 && nvm use 22 && nvm alias default 22
 npm install -g pnpm@9.15.2
 
 # 4. Clone and checkout
-git clone https://github.com/WACOMalt/aonsoku.git
+git clone https://github.com/WACOMalt/aonsoku-bs.git
 cd aonsoku
 git checkout v0.15.0
 
@@ -450,5 +450,5 @@ gh release upload v0.15.0 \
   dist/Aonsoku-v0.15.0-linux-*.AppImage \
   dist/Aonsoku-v0.15.0-linux-*.tar.gz \
   dist/Aonsoku-v0.15.0-linux-*.deb \
-  --repo WACOMalt/aonsoku
+  --repo WACOMalt/aonsoku-bs
 ```
