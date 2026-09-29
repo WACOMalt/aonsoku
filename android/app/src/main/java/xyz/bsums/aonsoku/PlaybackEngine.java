@@ -1,6 +1,7 @@
 package xyz.bsums.aonsoku;
 
 import android.content.Context;
+import android.util.Log;
 
 import androidx.annotation.OptIn;
 import androidx.media3.common.AudioAttributes;
@@ -23,6 +24,8 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
  * thread.
  */
 final class PlaybackEngine {
+
+    private static final String TAG = "NativePlayer";
 
     /** Next/previous pressed on the notification, lock screen or a headset. */
     interface CommandListener {
@@ -84,6 +87,7 @@ final class PlaybackEngine {
      * in the background; the web app follows when it is told of the change.
      */
     static void skipToNext(Player player) {
+        Log.i(TAG, "next pressed");
         int index = player.getCurrentMediaItemIndex();
         if (index + 1 < player.getMediaItemCount()) {
             player.seekTo(index + 1, 0);
@@ -95,6 +99,7 @@ final class PlaybackEngine {
 
     /** Previous, handled the same way as next. */
     static void skipToPrevious(Player player) {
+        Log.i(TAG, "previous pressed");
         int index = player.getCurrentMediaItemIndex();
         if (index >= 1) {
             player.seekTo(index - 1, 0);

@@ -2,6 +2,7 @@ package xyz.bsums.aonsoku;
 
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -75,6 +76,7 @@ public class NativePlayerPlugin extends Plugin {
         @Override
         public void onMediaItemTransition(@Nullable MediaItem item, int reason) {
             if (item == null) return;
+            Log.i(TAG, "transition to " + item.mediaId + " reason " + reason);
             applyVolume();
             JSObject data = new JSObject();
             data.put("key", item.mediaId);
@@ -91,6 +93,8 @@ public class NativePlayerPlugin extends Plugin {
 
         @Override
         public void onPlayWhenReadyChanged(boolean playWhenReady, int reason) {
+            Log.i(TAG, "playWhenReady " + playWhenReady + " reason " + reason
+                + (playWhenReady == requestedPlaying ? " (requested)" : " (from outside)"));
             if (playWhenReady == requestedPlaying) return;
             requestedPlaying = playWhenReady;
             JSObject data = new JSObject();
@@ -142,6 +146,7 @@ public class NativePlayerPlugin extends Plugin {
     @Override
     public void load() {
         PlaybackEngine.setCommandListener(action -> {
+            Log.i(TAG, "command to the web app: " + action);
             JSObject data = new JSObject();
             data.put("action", action);
             notifyListeners("command", data);
@@ -158,10 +163,7 @@ public class NativePlayerPlugin extends Plugin {
                 player.clearMediaItems();
                 player = null;
             }
-            if (controller != null) {
-                MediaController.releaseFuture(controller);
-                controller = null;
-            }
+            closeSession();
         });
         PlaybackEngine.setCommandListener(null);
         super.handleOnDestroy();
@@ -187,6 +189,8 @@ public class NativePlayerPlugin extends Plugin {
         float newVolume = call.getFloat("volume", volume);
 
         main.post(() -> {
+            Log.i(TAG, "load " + current.getString("key") + " at " + positionMs
+                + (playWhenReady ? " playing" : " paused"));
             ExoPlayer p = ensurePlayer();
             List<MediaItem> items = new ArrayList<>();
             if (previous != null) items.add(toMediaItem(previous));
@@ -265,6 +269,7 @@ public class NativePlayerPlugin extends Plugin {
                     }
                 }
             }
+            Log.i(TAG, "skip to " + key + (skipped ? "" : " missed"));
             result.put("skipped", skipped);
             call.resolve(result);
         });
@@ -274,6 +279,7 @@ public class NativePlayerPlugin extends Plugin {
     public void setPlaying(PluginCall call) {
         boolean playing = Boolean.TRUE.equals(call.getBoolean("playing", false));
         main.post(() -> {
+            Log.i(TAG, "setPlaying " + playing);
             requestedPlaying = playing;
             if (player != null) {
                 if (playing && player.getPlaybackState() == Player.STATE_IDLE
@@ -316,16 +322,22 @@ public class NativePlayerPlugin extends Plugin {
         });
     }
 
-    /** Stops and empties the player, which also removes its notification. */
+    /**
+     * Stops and empties the player and closes its media session, so the
+     * system sends media buttons to whatever plays instead (the WebView
+     * player, for radio or a Connect remote) rather than to an idle session.
+     */
     @PluginMethod
     public void stop(PluginCall call) {
         main.post(() -> {
+            Log.i(TAG, "stop");
             requestedPlaying = false;
             main.removeCallbacks(progressTick);
             if (player != null) {
                 player.stop();
                 player.clearMediaItems();
             }
+            closeSession();
             call.resolve();
         });
     }
@@ -349,6 +361,15 @@ public class NativePlayerPlugin extends Plugin {
             controller = new MediaController.Builder(context, token).buildAsync();
         }
         return player;
+    }
+
+    /** Disconnects from PlaybackService and stops it, ending its session. */
+    private void closeSession() {
+        if (controller == null) return;
+        MediaController.releaseFuture(controller);
+        controller = null;
+        Context context = getContext();
+        context.stopService(new Intent(context, PlaybackService.class));
     }
 
     private MediaItem toMediaItem(JSObject item) {
