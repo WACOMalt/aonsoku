@@ -1,16 +1,40 @@
 import { io, Socket } from 'socket.io-client'
 import { useAppStore } from '@/store/app.store'
 import { useConnectStore } from '@/store/connect.store'
-import { useJamStore } from '@/store/jam.store'
+import { IAccountJam, useJamStore } from '@/store/jam.store'
 import { usePlayerStore } from '@/store/player.store'
+import { LoopState } from '@/types/playerContext'
 import { ISong } from '@/types/responses/song'
 import { getDeviceId, getDeviceName } from '@/utils/deviceId'
 import { describeSyncError, getSyncAuth } from '@/utils/syncAuth'
 import { getSyncServerUrl } from '@/utils/syncServerUrl'
 
+/** What the playing device reports to the others. */
+type RemotePlaybackState = {
+  songId: string
+  isPlaying: boolean
+  progress?: number
+  timestamp: number
+  queue?: ISong[]
+  loopState?: LoopState
+  isShuffleActive?: boolean
+  originalQueue?: ISong[]
+}
+
 class ConnectService {
   private socket: Socket | null = null
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null
+  private jamStatusFallback: ReturnType<typeof setTimeout> | undefined
+  // Back from listening offline (see goOnline): 'ask' offers to resume the
+  // online queue or keep this one, 'keep' takes over with this one.
+  private returning: 'ask' | 'keep' | null = null
+  // Waiting to learn whether the online session has a queue to resume.
+  private awaitingOnline: {
+    choice: 'ask' | 'keep'
+    timer: ReturnType<typeof setTimeout>
+  } | null = null
+  // Resuming the online queue: keep playing once it has been applied.
+  private resumePlaying = false
   private _isSyncing = false
   // See JamService: the queue is only sent when it changes.
   private lastSentQueue: ISong[] | null = null
@@ -32,6 +56,8 @@ class ConnectService {
     // One socket at a time; a second call while connecting (e.g. a double
     // mount) would otherwise open another.
     if (!username || this.socket) return
+    // Listening offline: stay off the sync server until they go online.
+    if (useConnectStore.getState().offline) return
 
     const syncUrl = getSyncServerUrl()
     if (!syncUrl) {
@@ -79,6 +105,15 @@ class ConnectService {
       setConnecting(false)
       setThisDeviceId(socket.id!)
       console.log('[Connect] Connected to sync server, device:', socket.id)
+      // A sync server that predates account-wide Jam status never sends
+      // it; after a moment, treat that as "no Jam" so a Jam remembered
+      // across a reload is still rejoined.
+      clearTimeout(this.jamStatusFallback)
+      this.jamStatusFallback = setTimeout(() => {
+        if (useJamStore.getState().accountJam === undefined) {
+          useJamStore.getState().actions.setAccountJam(null)
+        }
+      }, 3000)
 
       // Start heartbeat
       this.startHeartbeat()
@@ -103,14 +138,53 @@ class ConnectService {
         )
       }
       this.remoteState = null
+      clearTimeout(this.jamStatusFallback)
+      useJamStore.getState().actions.setAccountJam(undefined)
       setConnected(false)
       this.stopHeartbeat()
       console.log('[Connect] Disconnected from sync server')
     })
 
+    // Which Jam this account is in, from any of its devices (a Jam plays on
+    // the one device that plays audio; the others show it from this).
+    socket.on('jam_status', (status: IAccountJam | null) => {
+      if (this.socket !== socket) return
+      clearTimeout(this.jamStatusFallback)
+      useJamStore.getState().actions.setAccountJam(status)
+    })
+
     socket.on('devices_update', (devices) => {
       // A socket that has since been replaced must not touch state.
       if (this.socket !== socket) return
+      const returning = this.returning
+      this.returning = null
+      if (returning && usePlayerStore.getState().songlist.currentSong) {
+        // Back online with a queue here: this device takes the online
+        // session over, and keeps playing meanwhile. Whether to continue
+        // with its queue or the online one waits for the online state.
+        setDevices(
+          devices.map((device) => ({
+            ...device,
+            isActivePlayer: device.id === socket.id,
+          })),
+        )
+        this.awaitingOnline = {
+          choice: returning,
+          // No online state arrives when there is none: keep this queue.
+          timer: setTimeout(() => this.settleReturn(null), 1500),
+        }
+        return
+      }
+      if (this.awaitingOnline || useConnectStore.getState().onlineChoice) {
+        // Still deciding how to take over: stay the one playing here.
+        setDevices(
+          devices.map((device) => ({
+            ...device,
+            isActivePlayer: device.id === socket.id,
+          })),
+        )
+        return
+      }
       // This device kept playing through a dropped connection (a phone can
       // freeze the page in the background), and control was released while
       // it was away. It is still the one playing, so it takes control back
@@ -138,23 +212,18 @@ class ConnectService {
       }
     })
 
-    socket.on(
-      'sync_playback',
-      (data: {
-        songId: string
-        isPlaying: boolean
-        progress: number
-        timestamp: number
-        queue?: ISong[]
-      }) => {
-        if (this.socket !== socket) return
-        // Only sync if we're NOT the active player
-        const { isActivePlayer } = useConnectStore.getState()
-        if (isActivePlayer) return
+    socket.on('sync_playback', (data: RemotePlaybackState) => {
+      if (this.socket !== socket) return
+      if (this.awaitingOnline) {
+        this.settleReturn(data)
+        return
+      }
+      // Only sync if we're NOT the active player
+      const { isActivePlayer } = useConnectStore.getState()
+      if (isActivePlayer) return
 
-        this.handleRemoteSync(data)
-      },
-    )
+      this.handleRemoteSync(data)
+    })
 
     socket.on('become_active_player', (playbackState) => {
       // A socket that has since been replaced must not touch state.
@@ -165,12 +234,12 @@ class ConnectService {
 
       if (playbackState) {
         this.handleRemoteSync(playbackState)
+        const playing = this.resumePlaying || playbackState.isPlaying
         this.withSyncing(() =>
-          usePlayerStore
-            .getState()
-            .actions.setPlayingState(playbackState.isPlaying),
+          usePlayerStore.getState().actions.setPlayingState(playing),
         )
       }
+      this.resumePlaying = false
       // Changes made while syncing are not broadcast; announce the state
       // this device now owns once the flag clears.
       Promise.resolve().then(() => this.emitPlaybackState())
@@ -191,6 +260,9 @@ class ConnectService {
 
   disconnect() {
     this.stopHeartbeat()
+    if (this.awaitingOnline) clearTimeout(this.awaitingOnline.timer)
+    this.awaitingOnline = null
+    this.returning = null
     if (this.socket) {
       this.socket.disconnect()
       this.socket = null
@@ -217,7 +289,14 @@ class ConnectService {
       songId: currentSong.id,
       isPlaying: playerState.isPlaying,
       progress: playerProgress.progress,
+      loopState: playerState.loopState,
+      isShuffleActive: playerState.isShuffleActive,
       ...(queueChanged ? { queue: songlist.currentList } : {}),
+      // The order to go back to when shuffle is turned off, for a device
+      // that takes over while shuffled.
+      ...(queueChanged && playerState.isShuffleActive
+        ? { originalQueue: songlist.originalList }
+        : {}),
       timestamp: Date.now(),
     })
 
@@ -335,6 +414,81 @@ class ConnectService {
     }
   }
 
+  /**
+   * Leaves the sync server to listen privately on this device: nothing it
+   * plays reaches the online session, and remote control and Jam are off
+   * until goOnline. Leave any Jam on this device first (see goOffline in
+   * service/offline).
+   */
+  goOffline() {
+    const socket = this.socket
+    if (socket?.connected) {
+      if (useConnectStore.getState().isActivePlayer) {
+        // Other devices show at once that nothing plays online.
+        socket.emit('release_control')
+      } else {
+        // A remote becomes its own player with the queue it was showing,
+        // paused rather than suddenly making sound.
+        this.withSyncing(() =>
+          usePlayerStore.getState().actions.setPlayingState(false),
+        )
+      }
+    }
+    useConnectStore.getState().actions.setOffline(true)
+    this.disconnect()
+  }
+
+  /**
+   * Rejoins the online session; this device takes it over. With 'ask', and
+   * a queue both here and online, the listener picks which continues.
+   */
+  goOnline(choice: 'ask' | 'keep' = 'ask') {
+    useConnectStore.getState().actions.setOffline(false)
+    this.returning = choice
+    this.connect()
+  }
+
+  /** The listener chose: continue the online queue here, or this one. */
+  resolveOnlineChoice(choice: 'resume' | 'keep') {
+    useConnectStore.getState().actions.setOnlineChoice(null)
+    if (!this.socket?.connected) return
+    if (choice === 'keep') {
+      this.sendClaim()
+    } else {
+      this.resumePlaying = usePlayerStore.getState().playerState.isPlaying
+      this.socket.emit('transfer_playback', { targetDeviceId: this.socket.id })
+    }
+  }
+
+  // Back online: the online state (or its absence) has arrived.
+  private settleReturn(online: RemotePlaybackState | null) {
+    const awaiting = this.awaitingOnline
+    if (!awaiting) return
+    clearTimeout(awaiting.timer)
+    this.awaitingOnline = null
+    if (!online || awaiting.choice === 'keep') {
+      this.sendClaim()
+      return
+    }
+    const song =
+      online.queue?.find((track) => track.id === online.songId) ?? null
+    useConnectStore.getState().actions.setOnlineChoice({
+      onlineSong: song ? `${song.artist} - ${song.title}` : null,
+    })
+  }
+
+  /**
+   * Leaves or ends this account's Jam, or sets guest control, from any of
+   * its devices: the server passes it to the device in the Jam.
+   */
+  sendJamControl(
+    action: 'leave' | 'end' | 'guest_control',
+    options: { canControl?: boolean } = {},
+  ) {
+    if (!this.socket?.connected) return
+    this.socket.emit('jam_control', { action, ...options })
+  }
+
   sendRemoteCommand(command: string, args?: unknown) {
     if (!this.socket?.connected) return
     this.socket.emit('remote_command', { command, args })
@@ -360,13 +514,7 @@ class ConnectService {
     }
   }
 
-  private handleRemoteSync(data: {
-    songId: string
-    isPlaying: boolean
-    progress?: number
-    timestamp: number
-    queue?: ISong[]
-  }) {
+  private handleRemoteSync(data: RemotePlaybackState) {
     this._isSyncing = true
 
     try {
@@ -439,6 +587,28 @@ class ConnectService {
         usePlayerStore.getState().actions.setPlayingState(data.isPlaying)
       }
 
+      // Repeat and shuffle follow the playing device. The queue above
+      // already carries the shuffled order.
+      usePlayerStore.setState(
+        (state: ReturnType<typeof usePlayerStore.getState>) => {
+          if (
+            typeof data.loopState === 'number' &&
+            state.playerState.loopState !== data.loopState
+          ) {
+            state.playerState.loopState = data.loopState
+          }
+          if (
+            typeof data.isShuffleActive === 'boolean' &&
+            state.playerState.isShuffleActive !== data.isShuffleActive
+          ) {
+            state.playerState.isShuffleActive = data.isShuffleActive
+          }
+          if (data.originalQueue) {
+            state.songlist.originalList = data.originalQueue
+          }
+        },
+      )
+
       // Sync progress (drift correction). A passive device's audio is
       // silent, so it can follow exactly and its progress bar stays smooth.
       const { syncThreshold } = useJamStore.getState()
@@ -492,6 +662,26 @@ class ConnectService {
           )
           Promise.resolve().then(() => this.emitPlaybackState())
         }
+        break
+      case 'set_loop':
+        // Repeat changed on a remote (see toggleLoop).
+        if (
+          args &&
+          typeof args === 'object' &&
+          'loopState' in args &&
+          typeof (args as { loopState: number }).loopState === 'number'
+        ) {
+          const { loopState } = args as { loopState: LoopState }
+          usePlayerStore.setState(
+            (state: ReturnType<typeof usePlayerStore.getState>) => {
+              state.playerState.loopState = loopState
+            },
+          )
+        }
+        break
+      case 'toggle_shuffle':
+        // Shuffle changed on a remote (see toggleShuffle).
+        actions.toggleShuffle()
         break
       case 'seek':
         if (

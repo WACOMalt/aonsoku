@@ -123,6 +123,46 @@ const socketMeta = {}        // { [socketId]: { username, sessionType, sessionId
 // is worse than silence.
 const ACTIVE_RELEASE_GRACE_MS = 15000
 
+/**
+ * The Jam a user is in, seen from any of their devices: a Jam belongs to the
+ * account, while only the device playing it has a socket in its room. While
+ * the Jam moves between devices both can be in, and the latest join wins.
+ */
+function jamStatusFor(key) {
+  let found = null
+  for (const [id, jam] of Object.entries(jamSessions)) {
+    for (const participant of jam.participants) {
+      if (userKey(participant.name) !== key) continue
+      if (!found || participant.joinedAt > found.joinedAt) {
+        found = { id, jam, joinedAt: participant.joinedAt }
+      }
+    }
+  }
+  if (!found) return null
+  const { id, jam } = found
+  return {
+    id,
+    isLead: jam.host === key,
+    canGuestsControl: !!jam.canGuestsControl,
+    participants: jam.participants.map(({ id, name, isLead }) => ({ id, name, isLead })),
+    // This user's sockets in the room (normally one; two while handing over).
+    sockets: jam.participants.filter(p => userKey(p.name) === key).map(p => p.id),
+  }
+}
+
+// Tells every device of the user which Jam they are in.
+function emitJamStatus(key) {
+  const session = privateSessions[key]
+  if (!session) return
+  const status = jamStatusFor(key)
+  for (const [sid] of session.devices) io.to(sid).emit('jam_status', status)
+}
+
+// After a change to a Jam: its participants (and anyone who just left).
+function emitJamStatusForUsers(names) {
+  for (const key of new Set(names.map(userKey))) emitJamStatus(key)
+}
+
 function isActiveDevice(session, device) {
   return !!device && session.activeKey !== null && device.key === session.activeKey
 }
@@ -215,6 +255,8 @@ io.on('connection', (socket) => {
 
     console.log(`[Connect] ${username} connected device "${device.name}" (Active: ${isActive})`);
 
+    socket.emit('jam_status', jamStatusFor(key));
+
     // ── Private Session Events ──
 
     socket.on('playback_update', (data) => {
@@ -265,6 +307,36 @@ io.on('connection', (socket) => {
           io.to(sid).emit('remote_command', { command, args });
         }
       }
+    });
+
+    // Leave or end the user's Jam, or change guest control, from any of
+    // their devices, including ones not in the Jam's room.
+    socket.on('jam_control', ({ action, canControl } = {}) => {
+      const status = jamStatusFor(key);
+      if (!status) return;
+      const jam = jamSessions[status.id];
+      if (!jam) return;
+      if (action === 'end' && jam.host === key) {
+        const names = jam.participants.map(p => p.name);
+        io.to(status.id).emit('session_ended');
+        delete jamSessions[status.id];
+        emitJamStatusForUsers(names);
+      } else if (action === 'leave') {
+        for (const sid of status.sockets) io.to(sid).emit('jam_leave_request');
+      } else if (action === 'guest_control' && jam.host === key) {
+        jam.canGuestsControl = !!canControl;
+        io.to(status.id).emit('guest_control_update', { canGuestsControl: jam.canGuestsControl });
+        emitJamStatusForUsers(jam.participants.map(p => p.name));
+      }
+    });
+
+    // The playing device is going offline (listening privately): it gives
+    // up control at once instead of after the reconnect grace period.
+    socket.on('release_control', () => {
+      const privateSession = privateSessions[key];
+      const dev = privateSession && findDeviceBySocket(privateSession, socket.id);
+      if (!dev || !isActiveDevice(privateSession, dev)) return;
+      clearControl(key);
     });
 
     socket.on('heartbeat', () => {
@@ -331,7 +403,8 @@ io.on('connection', (socket) => {
     const user = {
       id: socket.id,
       name: username,
-      isLead
+      isLead,
+      joinedAt: Date.now()
     };
     socket.emit('jam_role', { isLead });
 
@@ -342,6 +415,7 @@ io.on('connection', (socket) => {
 
     // Broadcast updated participant list to everyone in the room
     io.to(sessionId).emit('participants_update', jamSessions[sessionId].participants);
+    emitJamStatusForUsers(jamSessions[sessionId].participants.map(p => p.name));
 
     // If there's an existing playback state, catch the new user up
     if (jamSessions[sessionId].lastState) {
@@ -367,11 +441,13 @@ io.on('connection', (socket) => {
       const session = jamSessions[sessionId];
       if (session) {
         session.participants = session.participants.filter(p => p.id !== socket.id);
+        const names = [username, ...session.participants.map(p => p.name)];
         if (session.participants.length === 0) {
           delete jamSessions[sessionId];
         } else {
           io.to(sessionId).emit('participants_update', session.participants);
         }
+        emitJamStatusForUsers(names);
       }
       socket.leave(sessionId);
       delete socketMeta[socket.id];
@@ -385,6 +461,7 @@ io.on('connection', (socket) => {
       if (!sender || !sender.isLead) return;
       session.canGuestsControl = canControl;
       io.to(sessionId).emit('guest_control_update', { canGuestsControl: canControl });
+      emitJamStatusForUsers(session.participants.map(p => p.name));
     });
 
     socket.on('end_session', () => {
@@ -392,8 +469,10 @@ io.on('connection', (socket) => {
       if (!session) return;
       const sender = session.participants.find(p => p.id === socket.id);
       if (!sender || !sender.isLead) return;
+      const names = session.participants.map(p => p.name);
       io.to(sessionId).emit('session_ended');
       delete jamSessions[sessionId];
+      emitJamStatusForUsers(names);
       delete socketMeta[socket.id];
       socket.disconnect(true);
     });
@@ -401,6 +480,7 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
       if (jamSessions[sessionId]) {
         jamSessions[sessionId].participants = jamSessions[sessionId].participants.filter(p => p.id !== socket.id);
+        const names = [username, ...jamSessions[sessionId].participants.map(p => p.name)];
 
         if (jamSessions[sessionId].participants.length === 0) {
           console.log(`[Jam] Session ended: ${sessionId}`);
@@ -408,6 +488,7 @@ io.on('connection', (socket) => {
         } else {
           io.to(sessionId).emit('participants_update', jamSessions[sessionId].participants);
         }
+        emitJamStatusForUsers(names);
       }
       delete socketMeta[socket.id];
       console.log(`[Jam] ${username} left session ${sessionId}`);
@@ -422,7 +503,14 @@ function releaseControl(username, deviceKey) {
   if (!session || session.activeKey !== deviceKey) return
   const stillHere = Array.from(session.devices.values()).some(d => d.key === deviceKey)
   if (stillHere) return
+  clearControl(username)
+}
 
+// Nobody plays any more: the shared state stops, and every device hears so.
+function clearControl(username) {
+  const session = privateSessions[username]
+  if (!session) return
+  clearTimeout(session.releaseTimer)
   session.activeKey = null
   session.releaseTimer = null
   if (session.playbackState) {

@@ -1,6 +1,7 @@
 import { io, Socket } from 'socket.io-client'
 import { connectService } from '@/service/connect'
 import { useAppStore } from '@/store/app.store'
+import { useConnectStore } from '@/store/connect.store'
 import { useJamStore } from '@/store/jam.store'
 import { usePlayerStore } from '@/store/player.store'
 import { ISong } from '@/types/responses/song'
@@ -29,6 +30,9 @@ class JamService {
   // or rejoining after a reload). Their pre-Jam queue is then still the one
   // saved before that earlier Jam, and must not be overwritten.
   private keepSnapshot = false
+  // A Jam remembered across a reload, waiting for Connect to say whether
+  // this device is the one to play it (see reconcileWithAccount).
+  private rejoinPending = false
 
   get isSyncing() {
     return this._isSyncing
@@ -78,6 +82,8 @@ class JamService {
       useJamStore.getState().actions
 
     if (!sessionId) return
+    // Listening offline: Jam is off until they go online.
+    if (useConnectStore.getState().offline) return
     // The Jam plays on the device the listener is using, not on another of
     // their devices, so this one takes over audio (Connect).
     connectService.claimControl()
@@ -175,10 +181,17 @@ class JamService {
     })
 
     this.socket.on('session_ended', () => {
+      // The host may have ended it from another of their devices.
+      const wasLead = useJamStore.getState().isLead
       this.socket?.disconnect()
       this.socket = null
       useJamStore.getState().actions.reset()
-      this.finishJam('host-ended')
+      this.finishJam(wasLead ? 'ended' : 'host-ended')
+    })
+
+    // Left from another of this listener's devices.
+    this.socket.on('jam_leave_request', () => {
+      this.disconnect()
     })
   }
 
@@ -390,11 +403,93 @@ class JamService {
    * a guest only rejoins if it still exists.
    */
   rejoinPersistedSession() {
-    const { id, isConnected, isConnecting, isLead } = useJamStore.getState()
+    const { id, isConnected, isConnecting } = useJamStore.getState()
     if (!id || isConnected || isConnecting || this.socket) return
-    this.keepSnapshot = true
-    this.connect(isLead ? 'create' : 'join')
+    // Only the device that plays rejoins, which Connect has yet to say.
+    this.rejoinPending = true
+    this.reconcileWithAccount()
+  }
+
+  /**
+   * A Jam belongs to the listener's account and plays on whichever of their
+   * devices plays audio (Connect). This device joins the Jam's room when it
+   * is that device, and leaves it quietly once another of their devices has
+   * taken the Jam over.
+   */
+  reconcileWithAccount() {
+    const connect = useConnectStore.getState()
+    const jam = useJamStore.getState()
+    const account = jam.accountJam
+    // Wait until the server has said who plays and which Jam this is.
+    if (!connect.isConnected || account === undefined) return
+    if (!connect.devices.some((device) => device.id === connect.thisDeviceId)) {
+      return
+    }
+
+    if (connect.isActivePlayer) {
+      if (this.socket) {
+        this.rejoinPending = false
+        return
+      }
+      if (account) {
+        this.rejoinPending = false
+        this.keepSnapshot = true
+        jam.actions.setSession(account.id, account.isLead)
+        this.connect(account.isLead ? 'create' : 'join')
+      } else if (this.rejoinPending && jam.id) {
+        // The server no longer has it (restarted): a host recreates it.
+        this.rejoinPending = false
+        this.keepSnapshot = true
+        this.connect(jam.isLead ? 'create' : 'join')
+      }
+      return
+    }
+
+    // Another of the listener's devices plays.
+    this.rejoinPending = false
+    if (!this.socket) {
+      // A Jam remembered from before a reload is that device's now.
+      if (jam.id && !jam.isConnecting) jam.actions.reset()
+      return
+    }
+    const mine = this.socket.id
+    if (account && account.id !== jam.id) {
+      // They joined another Jam there; one this device hosts ends, as
+      // when switching Jams on one device.
+      this.leaveQuietly(jam.isLead)
+    } else if (account?.sockets.some((id) => id !== mine)) {
+      // That device has joined this Jam: hand it over.
+      this.leaveQuietly(false)
+    }
+  }
+
+  /** Leaves the Jam's room without the end-of-Jam prompt or restore. */
+  private leaveQuietly(end: boolean) {
+    if (!this.socket) return
+    this.socket.emit(end ? 'end_session' : 'leave_session')
+    this.socket.removeAllListeners()
+    this.socket.disconnect()
+    this.socket = null
+    this.lastSentQueue = null
+    useJamStore.getState().actions.reset()
   }
 }
 
 export const jamService = new JamService()
+
+// Follow the account's Jam as devices take over playback (see
+// reconcileWithAccount).
+useConnectStore.subscribe((state, previous) => {
+  if (
+    state.isActivePlayer !== previous.isActivePlayer ||
+    state.isConnected !== previous.isConnected ||
+    state.devices !== previous.devices
+  ) {
+    jamService.reconcileWithAccount()
+  }
+})
+useJamStore.subscribe((state, previous) => {
+  if (state.accountJam !== previous.accountJam) {
+    jamService.reconcileWithAccount()
+  }
+})

@@ -5,6 +5,7 @@ import { FullscreenMode } from '@/app/components/fullscreen/page'
 import { MobileBottomNav } from '@/app/components/mobile/bottom-nav'
 import { JamEndPrompt } from '@/app/components/player/jam-end-prompt'
 import { JamJoinPrompt } from '@/app/components/player/jam-join-prompt'
+import { OnlineChoicePrompt } from '@/app/components/player/online-choice-prompt'
 import { Player } from '@/app/components/player/player'
 import { CreatePlaylistDialog } from '@/app/components/playlist/form-dialog'
 import { RemovePlaylistDialog } from '@/app/components/playlist/remove-dialog'
@@ -51,6 +52,7 @@ export default function BaseLayout() {
       <MemoFullscreenMode />
       <JamJoinPrompt />
       <JamEndPrompt />
+      <OnlineChoicePrompt />
       {/* Search: one dialog, opened from the sidebar, tab bar or shortcut. */}
       <CommandMenu />
     </div>

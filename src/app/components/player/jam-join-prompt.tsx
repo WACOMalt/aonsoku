@@ -10,6 +10,8 @@ import {
   DialogTitle,
 } from '@/app/components/ui/dialog'
 import { jamService } from '@/service/jam'
+import { goOnline } from '@/service/offline'
+import { useConnectOffline } from '@/store/connect.store'
 import { useJamStore } from '@/store/jam.store'
 import { isDesktop } from '@/utils/desktop'
 import { buildJamAppLink } from '@/utils/jamLinks'
@@ -33,6 +35,12 @@ const COPY = {
       "You're hosting a Jam. Joining this one ends yours for everyone in it.",
     action: 'End mine and join',
   },
+  offline: {
+    title: 'Join a Music Jam?',
+    description:
+      "You've been invited to listen together. You're listening offline, so this device goes online to join.",
+    action: 'Go online and join',
+  },
 } as const
 
 /**
@@ -47,6 +55,7 @@ export function JamJoinPrompt() {
   const isConnected = useJamStore((state) => state.isConnected)
   const isConnecting = useJamStore((state) => state.isConnecting)
   const isLead = useJamStore((state) => state.isLead)
+  const offline = useConnectOffline()
 
   const inJam = !!currentId && (isConnected || isConnecting)
   const alreadyInIt = !!pendingId && pendingId === currentId && inJam
@@ -62,12 +71,15 @@ export function JamJoinPrompt() {
 
   if (!pendingId || alreadyInIt) return null
 
-  const copy = COPY[!inJam ? 'join' : isLead ? 'host' : 'guest']
+  const copy =
+    COPY[offline ? 'offline' : !inJam ? 'join' : isLead ? 'host' : 'guest']
   // In a browser, offer the installed app the way Spotify's web page does.
   const offerApp = !isCapacitor() && !isDesktop()
 
   const handleJoin = () => {
     clearPending()
+    // The Jam replaces the queue anyway, so this device just takes over.
+    if (offline) goOnline('keep')
     jamService.switchToSession(pendingId)
   }
 

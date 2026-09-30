@@ -23,6 +23,20 @@ export interface IJamParticipant {
   isLead: boolean
 }
 
+/**
+ * The Jam this listener's account is in, as the sync server sees it from
+ * any of their devices. Only the device playing the Jam is in its room; the
+ * others learn about it through this.
+ */
+export interface IAccountJam {
+  id: string
+  isLead: boolean
+  canGuestsControl: boolean
+  participants: IJamParticipant[]
+  /** This account's sockets in the Jam's room. */
+  sockets: string[]
+}
+
 export interface IJamSession {
   id: string | null
   participants: IJamParticipant[]
@@ -40,6 +54,8 @@ export interface IJamSession {
   syncServerUrl: string
   /** Set when a Jam ends; drives the restore-or-continue prompt. */
   endPrompt: IJamEndPrompt | null
+  /** undefined until the sync server has said; null when in no Jam. */
+  accountJam: IAccountJam | null | undefined
 }
 
 interface IJamActions {
@@ -58,6 +74,7 @@ interface IJamActions {
   setSyncServerUrl: (url: string) => void
   setIsLead: (value: boolean) => void
   setEndPrompt: (prompt: IJamEndPrompt | null) => void
+  setAccountJam: (jam: IAccountJam | null | undefined) => void
 }
 
 export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
@@ -77,6 +94,7 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
           pendingJamSessionId: null,
           syncServerUrl: '',
           endPrompt: null,
+          accountJam: undefined,
           actions: {
             setSession: (sessionId, isLead) => {
               set((state) => {
@@ -163,6 +181,11 @@ export const useJamStore = create<IJamSession & { actions: IJamActions }>()(
             setEndPrompt: (prompt) => {
               set((state) => {
                 state.endPrompt = prompt
+              })
+            },
+            setAccountJam: (jam) => {
+              set((state) => {
+                state.accountJam = jam
               })
             },
           },

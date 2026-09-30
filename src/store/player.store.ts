@@ -6,8 +6,11 @@ import { devtools, persist, subscribeWithSelector } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { shallow } from 'zustand/shallow'
 import { createWithEqualityFn } from 'zustand/traditional'
+import { connectService } from '@/service/connect'
+import { jamService } from '@/service/jam'
 import { scrobble } from '@/service/scrobble'
 import { subsonic } from '@/service/subsonic'
+import { isPassiveConnectDevice } from '@/store/connect.store'
 import {
   IPlayerContext,
   ISongList,
@@ -18,8 +21,6 @@ import { ISong } from '@/types/responses/song'
 import { areSongListsEqual } from '@/utils/compareSongLists'
 import { isDesktop } from '@/utils/desktop'
 import { discordRpc } from '@/utils/discordRpc'
-import { connectService } from '@/service/connect'
-import { jamService } from '@/service/jam'
 import { addNextSongList, shuffleSongList } from '@/utils/songListFunctions'
 import { idbStorage } from './idb'
 
@@ -490,11 +491,27 @@ export const usePlayerStore = createWithEqualityFn<IPlayerContext>()(
               const newState =
                 (loopState + 1) % (Object.keys(LoopState).length / 2)
 
+              // On a Connect remote the playing device owns repeat: ask it,
+              // and show its answer when it reports back.
+              if (isPassiveConnectDevice()) {
+                connectService.sendRemoteCommand('set_loop', {
+                  loopState: newState,
+                })
+                return
+              }
+
               set((state) => {
                 state.playerState.loopState = newState
               })
             },
             toggleShuffle: () => {
+              // On a Connect remote the playing device shuffles (only one
+              // device may, or their orders would differ).
+              if (isPassiveConnectDevice()) {
+                connectService.sendRemoteCommand('toggle_shuffle')
+                return
+              }
+
               const { isShuffleActive } = get().playerState
               const { currentList, currentSongIndex } = get().songlist
 
@@ -1405,6 +1422,8 @@ usePlayerStore.subscribe(
   (state) => ({
     songId: state.songlist.currentSong?.id,
     isPlaying: state.playerState.isPlaying,
+    loopState: state.playerState.loopState,
+    isShuffleActive: state.playerState.isShuffleActive,
   }),
   () => {
     if (!jamService.isSyncing) {
